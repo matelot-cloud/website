@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Install Matelot · Matelot docs</title>
+<link rel="icon" href="../../assets/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
+<meta name="docs-version" content="v0.1">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../../"><img src="../../assets/logo.png" alt="">Matelot<span class="dim">docs</span></a>
+  <nav class="top-links"><a href="../../">Home</a><a href="index.html">Docs</a><a class="current" href="install.html">Install</a><a href="https://github.com/matelot-io/matelot" target="_blank" rel="noopener">GitHub</a></nav>
+  <div class="search"><input id="q" type="search" placeholder="Search the docs…" autocomplete="off" aria-label="Search"><div id="results" class="results" hidden></div></div>
+  <label class="version"><span class="sr-only">Version</span><select id="version" aria-label="Documentation version"><option value="v0.1">v0.1</option></select></label>
+</header>
+<div class="page">
+  <button class="nav-toggle" aria-expanded="false" aria-controls="side">Contents</button>
+  <nav class="side" id="side"><ul><li class="section"><span>Start here</span><ul><li><a href="index.html">Documentation</a></li><li class="current"><a href="install.html">Install Matelot</a></li><li><a href="product.html">What the platform does</a></li><li><a href="roles.html">Roles and permissions</a></li><li><a href="coverage.html">Service coverage</a></li></ul></li><li class="section"><span>CLI and automation</span><ul><li><a href="cli.html">CLI guide</a></li><li><a href="cli-reference.html">Command reference</a></li><li><a href="ci-integration.html">CI/CD integration</a></li><li><a href="access-tokens.html">Access tokens</a></li><li><a href="mcp.html">MCP server (AI assistants)</a></li></ul></li><li class="section"><span>Connections and registries</span><ul><li><a href="github-app.html">GitHub App</a></li><li><a href="keyless-registries.html">Keyless registry access</a></li><li><a href="builds-releases-deployments.html">Builds, releases, deployments</a></li></ul></li><li class="section"><span>Runners</span><ul><li><a href="managed-runners.html">Managed runners</a></li><li><a href="runner-protocol.html">Runner protocol</a></li></ul></li><li class="section"><span>Operating a cell</span><ul><li><a href="backup-restore.html">Backup and restore</a></li><li><a href="usage-and-limits.html">Usage and rate limits</a></li><li><a href="endpoints.html">Endpoints of a cell</a></li></ul></li><li class="section"><span>Reference</span><ul><li><a href="parity-matrix.html">UI / API / CLI / MCP parity</a></li><li><a href="adr-0001.html">ADR 1: tenancy and stack</a></li><li><a href="adr-0002.html">ADR 2: web app</a></li><li><a href="adr-0003.html">ADR 3: two-level RBAC</a></li></ul></li></ul></nav>
+  <main class="content">
+    <div class="crumbs">Start here</div>
+    <article><h1 id="install-matelot"><a class="anchor" href="#install-matelot">Install Matelot</a></h1>
+<p>Matelot runs as <strong>one cell per organization</strong> in your own Kubernetes cluster: the API, the worker, the web app, managed
+runners, a container registry, Postgres, Redis and Keycloak, installed from one Helm chart. Nothing is shared with
+anyone else and nothing leaves the cluster except the integrations you connect. This guide takes you from an empty
+namespace to the first administrator logged in, with backups on.</p>
+<h2 id="1-requirements"><a class="anchor" href="#1-requirements">1. Requirements</a></h2>
+<table>
+<thead>
+<tr>
+<th>Need</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Kubernetes 1.28 or newer, <code>kubectl</code> and Helm 3.12+</td>
+<td>any conformant distribution; tested on kind, EKS, GKE and AKS storage defaults</td>
+</tr>
+<tr>
+<td>An ingress controller (class <code>nginx</code> by default)</td>
+<td>the chart creates three Ingresses per cell</td>
+</tr>
+<tr>
+<td>cert-manager with a <code>ClusterIssuer</code>, <strong>or</strong> your own TLS Secrets</td>
+<td>hostnames <code>&lt;slug&gt;.&lt;domain&gt;</code>, <code>auth-&lt;slug&gt;.&lt;domain&gt;</code>, <code>registry-&lt;slug&gt;.&lt;domain&gt;</code></td>
+</tr>
+<tr>
+<td>A DNS record for those hostnames (a wildcard <code>*.&lt;domain&gt;</code> is simplest)</td>
+<td></td>
+</tr>
+<tr>
+<td>A default StorageClass</td>
+<td>Postgres, the registry and backups use volumes; <code>WaitForFirstConsumer</code> classes are fine</td>
+</tr>
+<tr>
+<td>Outbound access to <code>ghcr.io</code></td>
+<td>images and the chart are public packages; mirror them for air-gapped clusters</td>
+</tr>
+<tr>
+<td>Resources for a small cell</td>
+<td>about 2 vCPU and 5 GiB of memory requested across all components; Keycloak is the largest</td>
+</tr>
+</tbody></table>
+<p>Optional: an S3-compatible bucket for off-site backups, an SMTP relay for e-mail notifications, a GitHub App for
+GitHub repositories (any Git host also works with tokens).</p>
+<h2 id="2-choose-the-cell-s-values"><a class="anchor" href="#2-choose-the-cell-s-values">2. Choose the cell&#39;s values</a></h2>
+<pre><code class="language-bash">helm show values oci://ghcr.io/matelot-io/charts/secops-cell --version 0.1.0 &gt; values.yaml
+</code></pre>
+<p>The settings that matter for a first install:</p>
+<pre><code class="language-yaml">tenant:
+  slug: acme                      # DNS label; hostnames, namespace and the root organization are derived from it
+  name: &quot;ACME Corporation&quot;
+  domain: platform.example.com    # app: acme.platform.example.com · auth: auth-acme.… · registry: registry-acme.…
+  adminEmails: [&quot;ciso@acme.com&quot;]  # the first login of these e-mails becomes administrator of the root organization
+
+ingress:
+  className: nginx
+  tls: true
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+
+postgres:
+  bundled: true                   # in-cluster Postgres with a volume; or bundled: false + externalUrl for a managed database
+  password: &quot;&lt;generate one&gt;&quot;
+keycloak:
+  adminPassword: &quot;&lt;generate one&gt;&quot; # the Keycloak admin console (auth-acme.…); users come from your identity provider
+  allowPasswordGrant: false
+  seedUsers: []
+
+backup:
+  enabled: true
+  schedule: &quot;17 2 * * *&quot;          # daily, UTC
+  pvc: { enabled: true, size: 20Gi }
+  s3:                             # optional off-site copy
+    enabled: false
+</code></pre>
+<p>Images are <code>ghcr.io/matelot-io/{api,worker,web,runner}</code> at the chart&#39;s <code>appVersion</code>; leave the <code>image</code> blocks alone
+unless you mirror them. Everything else (replicas, resources, managed runner count, SMTP via <code>api.extraEnv</code>) has a
+documented default in <code>values.yaml</code>.</p>
+<h2 id="3-install"><a class="anchor" href="#3-install">3. Install</a></h2>
+<pre><code class="language-bash">helm install acme oci://ghcr.io/matelot-io/charts/secops-cell --version 0.1.0 \
+  --namespace tenant-acme --create-namespace -f values.yaml
+kubectl -n tenant-acme get pods -w
+</code></pre>
+<p>The first start takes a few minutes: Keycloak imports its realm, the API&#39;s init container runs the database
+migrations, the managed runner registers once the API answers. Do not use <code>helm install --wait</code> with backups on a
+PVC whose StorageClass binds on first use (kind, EKS gp3, GKE, AKS defaults): that PVC stays Pending until the
+first backup mounts it and <code>--wait</code> would wait for it. Instead, when every pod is <code>Running</code>:</p>
+<pre><code class="language-bash">kubectl -n tenant-acme create job acme-backup-first --from=cronjob/acme-backup   # first backup, binds the volume
+kubectl -n tenant-acme logs job/acme-backup-first -f
+</code></pre>
+<p>The chart generates and keeps its own secrets (the encryption key for stored credentials, the registry token key
+pair, the managed-runner secret); they survive upgrades and are part of every backup.</p>
+<h2 id="4-first-login-and-identity"><a class="anchor" href="#4-first-login-and-identity">4. First login and identity</a></h2>
+<ol>
+<li>Open <code>https://auth-acme.platform.example.com</code> as the Keycloak admin (<code>keycloak.adminPassword</code>), realm <code>platform</code>,
+and add your identity provider (SAML or OIDC: Entra ID, Okta, Google Workspace…). Users are created on first
+login; the e-mail address is what Matelot keys users on.</li>
+<li>Open <code>https://acme.platform.example.com</code> and log in as one of <code>tenant.adminEmails</code>: that first login grants the
+administrator role on the root organization. Invite the team from <strong>Members</strong>.</li>
+<li>The Overview shows the organization setup: connect source code, check the managed runner, alerts, team. From
+there, create a project and a service, attach a repository and run the security pipeline.</li>
+</ol>
+<p>For a quick evaluation without an identity provider, <code>keycloak.seedUsers</code> creates local users (and
+<code>keycloak.allowPasswordGrant: true</code> lets the CLI log in with a password); remove both for production.</p>
+<h2 id="5-the-cli"><a class="anchor" href="#5-the-cli">5. The CLI</a></h2>
+<pre><code class="language-bash">npm install -g secops-platform-cli
+matelot login --url https://acme.platform.example.com
+matelot whoami
+</code></pre>
+<p>CI pipelines authenticate with signed CI tokens (created in the web app under Access tokens), never with a user
+password: see the CI/CD integration page.</p>
+<h2 id="6-backups"><a class="anchor" href="#6-backups">6. Backups</a></h2>
+<p>With <code>backup.enabled</code> the cell backs itself up on the schedule: <code>pg_dump</code> of the platform and Keycloak databases plus
+the cell&#39;s secrets, as one archive on the backups volume and, if configured, in your S3 bucket. The archive
+contains the encryption key and passwords: restrict the bucket and the volume to the cell&#39;s operators.</p>
+<p>Restore, including rebuilding a cell on a new cluster, is described on the Backup and restore page. The order
+matters there: the secrets must be restored <strong>before</strong> <code>helm install</code>, so the restored data can be decrypted.</p>
+<h2 id="7-upgrades"><a class="anchor" href="#7-upgrades">7. Upgrades</a></h2>
+<p>Each release ships the four images and the chart at the same version. To upgrade:</p>
+<pre><code class="language-bash">helm upgrade acme oci://ghcr.io/matelot-io/charts/secops-cell --version 0.2.0 \
+  --namespace tenant-acme -f values.yaml
+</code></pre>
+<p>Take a backup first (the CronJob, or a manual job as above). Migrations run in the API&#39;s init container before the
+new API starts. An image release rolls only the api, worker, web and runner pods; Postgres, Keycloak, Redis and the
+registry keep running. Release notes and image digests are published with every release at
+<a href="https://github.com/matelot-io/matelot/releases" target="_blank" rel="noopener">https://github.com/matelot-io/matelot/releases</a>; images and the chart are signed with cosign (keyless, GitHub OIDC)
+and carry SBOM attestations.</p>
+<h2 id="8-removing-a-cell"><a class="anchor" href="#8-removing-a-cell">8. Removing a cell</a></h2>
+<pre><code class="language-bash">helm uninstall acme --namespace tenant-acme     # keeps the volumes (databases, registry, backups) and the secrets
+kubectl delete namespace tenant-acme            # removes everything
+</code></pre>
+</article>
+    <footer>Matelot documentation · v0.1 · <a href="../../">home</a> · <a href="https://github.com/matelot-io/matelot/discussions" target="_blank" rel="noopener">questions</a> · <a href="https://github.com/matelot-io/matelot/releases" target="_blank" rel="noopener">releases</a></footer>
+  </main>
+  <nav class="toc"><div class="toc-title">On this page</div><ul><li class="d2"><a href="#1-requirements">1. Requirements</a></li><li class="d2"><a href="#2-choose-the-cell-s-values">2. Choose the cell's values</a></li><li class="d2"><a href="#3-install">3. Install</a></li><li class="d2"><a href="#4-first-login-and-identity">4. First login and identity</a></li><li class="d2"><a href="#5-the-cli">5. The CLI</a></li><li class="d2"><a href="#6-backups">6. Backups</a></li><li class="d2"><a href="#7-upgrades">7. Upgrades</a></li><li class="d2"><a href="#8-removing-a-cell">8. Removing a cell</a></li></ul></nav>
+</div>
+<script src="site.js" defer></script>
+</body>
+</html>
