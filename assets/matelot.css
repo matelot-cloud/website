@@ -1,0 +1,36 @@
+/* Matelot additions on top of the TemplateMo 621 Luminary stylesheet: brand mark, capability cards, indicative
+   pricing, and the pieces the documentation pages share with the landing page (header, code, links). */
+
+.nav-brand { display: inline-flex; align-items: center; gap: 10px; }
+.nav-logo { width: 26px; height: 26px; border-radius: 7px; }
+
+/* capabilities grid (8 cards) */
+.capability-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 56px; text-align: left; }
+.capability {
+  background: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 24px; padding: 28px 26px;
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  transition: transform 0.8s var(--silk-ease), border-color 0.8s var(--silk-ease);
+}
+.capability:hover { transform: translateY(-4px); border-color: rgba(176, 184, 196, 0.16); }
+.capability-index { font-size: 9px; font-weight: 600; letter-spacing: 0.3em; color: var(--slate-warm); opacity: 0.7; margin-bottom: 16px; }
+.capability h3 { font-size: 15px; font-weight: 600; letter-spacing: 0.01em; color: var(--ivory); margin-bottom: 10px; }
+.capability p { font-size: 0.84rem; font-weight: 300; line-height: 1.75; color: var(--slate-light); }
+.capability code, .faq-answer-inner code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; color: var(--ivory-muted); background: rgba(156, 163, 175, 0.08); padding: 1px 5px; border-radius: 4px; }
+@media (max-width: 1024px) { .capability-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .capability-grid { grid-template-columns: 1fr; } }
+
+/* pricing: one price per tier from content.json (no monthly/annual toggle) */
+.pricing-price { display: flex; align-items: baseline; gap: 4px; margin-bottom: 6px; }
+.pricing-currency { font-size: 1.1rem; font-weight: 300; color: var(--slate-light); }
+.pricing-amount { font-size: 2.6rem; font-weight: 300; line-height: 1; color: var(--ivory); }
+.pricing-unit { margin-left: 8px; font-size: 0.72rem; font-weight: 300; letter-spacing: 0.04em; color: var(--slate-light); }
+.pricing-billing { font-size: 0.72rem; font-weight: 300; letter-spacing: 0.08em; text-transform: uppercase; color: var(--slate-warm); margin-bottom: 18px; }
+.pricing-indicative { color: var(--ivory-muted); }
+.pricing-note { margin-top: 28px; font-size: 0.8rem; font-weight: 300; color: var(--slate-warm); }
+.pricing-card .pricing-features { flex: 1; }
+
+/* side readout can hold a version string */
+.side-readout { letter-spacing: 0.08em; }
+
+/* phone: the brand tag next to the logo wraps; the name is enough */
+@media (max-width: 760px) { .nav-brand span { display: none; } }

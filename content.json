@@ -1,0 +1,172 @@
+{
+  "product": "Matelot",
+  "tagline": "Product security for the software you ship — self-hosted",
+  "brandTag": "Self-hosted product security",
+  "site": {
+    "url": "https://matelot-io.github.io/website",
+    "title": "Matelot — product security, DevSecOps and CRA compliance, self-hosted in your cluster",
+    "description": "SBOMs, vulnerability correlation, policies and gates, keyless registries, managed runners and CRA evidence. One Helm chart, one cell per organization, in your own Kubernetes cluster.",
+    "github": "https://github.com/matelot-io/matelot",
+    "helmChart": "https://github.com/matelot-io/helm-charts",
+    "security": "security@matelot.io",
+    "sales": "sales@matelot.io",
+    "footerLinks": [
+      { "label": "Documentation", "href": "docs/latest/" },
+      { "label": "Install", "href": "docs/latest/install.html" },
+      { "label": "Helm chart", "href": "https://github.com/matelot-io/helm-charts" },
+      { "label": "GitHub", "href": "https://github.com/matelot-io/matelot" },
+      { "label": "Security", "href": "mailto:security@matelot.io" },
+      { "label": "Sales", "href": "mailto:sales@matelot.io" }
+    ]
+  },
+  "nav": [
+    { "label": "Features", "href": "#features" },
+    { "label": "Pricing", "href": "#pricing" },
+    { "label": "FAQ", "href": "#faq" },
+    { "label": "Docs", "href": "docs/latest/" },
+    { "label": "Install", "href": "docs/latest/install.html" },
+    { "label": "GitHub", "href": "https://github.com/matelot-io/matelot" }
+  ],
+  "hero": {
+    "badge": "Self-hosted · one cell per organization",
+    "title": "Know what you ship,<br><em>prove it is secure</em>",
+    "subtitle": "Matelot keeps a live picture of every product, service, release and deployment: what is in it, which vulnerabilities reach production, which policies apply, and the evidence the Cyber Resilience Act expects. It runs in your own Kubernetes cluster from one Helm chart, so your code, SBOMs and findings never leave your infrastructure.",
+    "primary": { "label": "Install Matelot", "href": "docs/latest/install.html" },
+    "secondary": { "label": "Read the docs", "href": "docs/latest/" },
+    "metrics": [
+      { "value": "1", "suffix": " cell", "label": "per organization: your cluster, your database, your identity realm" },
+      { "value": "4", "suffix": " images", "label": "plus one Helm chart — signed, with SBOM attestations, pulled from GitHub Packages" },
+      { "value": "0", "suffix": " secrets", "label": "stored for keyless registry access on AWS, Azure and Google" }
+    ]
+  },
+  "pillars": [
+    {
+      "tag": "Inventory and SBOM",
+      "title": "Every release has a <strong>bill of materials</strong>",
+      "body": "Repositories, builds, releases, container images and deployments form one graph. The security pipeline generates an SBOM per release, correlates it with vulnerability intelligence continuously, and tells you which products, versions and environments a CVE really affects — and whether production is exposed.",
+      "image": "assets/images/tm-luminary-01.jpg",
+      "alt": "Abstract visual for inventory and SBOM"
+    },
+    {
+      "tag": "Policies and gates",
+      "title": "Decide once, <strong>enforce everywhere</strong>",
+      "body": "Policies live at the organization, workspace, team or project and inherit downward. Pipelines evaluate them as gates; deployments can be rejected on the same rules. Exceptions are explicit, owned and time-limited. Service coverage shows which services still lack a repository, a recent scan, an SBOM, a policy or a recorded deployment.",
+      "image": "assets/images/tm-luminary-02.jpg",
+      "alt": "Abstract visual for policies and gates"
+    },
+    {
+      "tag": "CRA evidence",
+      "title": "Compliance as a <strong>by-product of shipping</strong>",
+      "body": "Each release gets a signed evidence bundle: what shipped, what was known, what was decided, what was enforced, where it ran. CRA readiness checks name the requirement each gap maps to. The audit trail records every change with who, what and why — in a database you operate.",
+      "image": "assets/images/tm-luminary-03.jpg",
+      "alt": "Abstract visual for compliance evidence"
+    }
+  ],
+  "capabilities": {
+    "tag": "Capabilities",
+    "title": "What is <strong>in the box</strong>",
+    "items": [
+      { "title": "Security pipeline", "body": "Checkout, SBOM, secrets, IaC, SAST and dependency scanning as one pipeline per service, with a policy gate at the end. Run it from the UI, the CLI or your CI." },
+      { "title": "Vulnerability and risk", "body": "Findings correlated against SBOMs and deployments; risk scored by CVSS, exploitation, exposure and criticality. The same CVE is Medium in development and Critical when internet-facing in production." },
+      { "title": "Keyless registries", "body": "Pull from and push to ECR, ACR and Artifact Registry with workload identity federation — the cell holds no long-lived registry secrets. Docker Hub, GHCR and any v2 registry work with tokens." },
+      { "title": "Managed and self-hosted runners", "body": "Every cell ships managed runners inside the cluster, so pipelines run on day one. Add your own runner pools for private networks and other clusters; jobs are routed by tags and pools." },
+      { "title": "Remediation and SLAs", "body": "A fix-first queue ordered by risk, SLA clocks per severity, owners, and issues created in GitHub, GitLab, Bitbucket or Jira with status kept in sync." },
+      { "title": "CLI, CI tokens and MCP", "body": "Every action in the UI is a `matelot` command. CI authenticates with signed, scoped tokens — never bearer secrets. The MCP server lets an AI assistant query the platform with your permissions." },
+      { "title": "Hierarchical RBAC and audit", "body": "Organization → workspace → team → project → service → environment, with roles that inherit downward, SSO through the cell's own Keycloak, and an audit trail on every mutation." },
+      { "title": "Built to be operated by you", "body": "One Helm chart installs the whole cell. Scheduled backups to a volume and your S3 bucket, a tested restore path, upgrades that roll only the application pods, usage per month, and a CLI for everything." }
+    ]
+  },
+  "integrations": {
+    "tag": "Integrations",
+    "title": "Connects to <strong>what you already run</strong>",
+    "body": "Only what exists today — nothing on this list is a roadmap item.",
+    "items": [
+      { "name": "GitHub", "icon": "github" },
+      { "name": "GitLab", "icon": "git" },
+      { "name": "Bitbucket", "icon": "git" },
+      { "name": "Amazon ECR", "icon": "registry" },
+      { "name": "Azure ACR", "icon": "registry" },
+      { "name": "Google Artifact Registry", "icon": "registry" },
+      { "name": "Docker Hub", "icon": "registry" },
+      { "name": "GHCR", "icon": "registry" },
+      { "name": "AWS keyless", "icon": "key" },
+      { "name": "Azure keyless", "icon": "key" },
+      { "name": "Google keyless", "icon": "key" },
+      { "name": "Jira", "icon": "ticket" },
+      { "name": "Slack", "icon": "chat" },
+      { "name": "Microsoft Teams", "icon": "chat" },
+      { "name": "Webhooks", "icon": "webhook" },
+      { "name": "E-mail", "icon": "mail" },
+      { "name": "Kubernetes", "icon": "k8s" },
+      { "name": "MCP (Claude)", "icon": "ai" }
+    ]
+  },
+  "pricing": {
+    "tag": "Pricing",
+    "title": "Per user, <strong>self-hosted</strong>",
+    "body": "Every tier is the same software, installed in your cluster from the same chart. Tiers differ in team size, integrations and support. Prices are per user and month, billed annually.",
+    "indicative": "Indicative",
+    "note": "Indicative — tiers and prices will be confirmed with the first commercial release. No licence key is required to install today; entitlements arrive with the commercial release and existing cells keep working.",
+    "currency": "$",
+    "unit": "per user / month",
+    "tiers": [
+      {
+        "name": "Free",
+        "price": "0",
+        "billing": "forever",
+        "description": "A small team getting its products under control.",
+        "features": ["Full platform: SBOM, pipelines, policies and gates, CRA readiness", "Up to 5 users", "Managed runners in the cell", "Community support in GitHub Discussions"],
+        "cta": { "label": "Install now", "href": "docs/latest/install.html" },
+        "featured": false
+      },
+      {
+        "name": "Premium",
+        "price": "29",
+        "billing": "billed annually",
+        "description": "Several teams, self-hosted runners, issue trackers and SLAs.",
+        "features": ["Everything in Free", "Unlimited users", "Self-hosted runner pools", "Jira / GitHub / GitLab / Bitbucket issues and SLAs", "Signed evidence bundles", "Priority e-mail support"],
+        "cta": { "label": "Talk to sales", "href": "mailto:sales@matelot.io?subject=Matelot%20Premium" },
+        "featured": true
+      },
+      {
+        "name": "Ultimate",
+        "price": "99",
+        "billing": "billed annually",
+        "description": "Subsidiaries, MSSP use and a support contract.",
+        "features": ["Everything in Premium", "Organization hierarchy for subsidiaries and MSSP customers", "SSO / SAML and MFA through the cell's Keycloak", "Support with response-time SLA, onboarding and upgrade assistance", "Early access to releases and roadmap input"],
+        "cta": { "label": "Talk to sales", "href": "mailto:sales@matelot.io?subject=Matelot%20Ultimate" },
+        "featured": false
+      }
+    ]
+  },
+  "testimonials": {
+    "enabled": false,
+    "tag": "What teams say",
+    "title": "Placeholder — <strong>no quotes yet</strong>",
+    "items": []
+  },
+  "faq": {
+    "tag": "Frequently asked",
+    "title": "Questions we hear <strong>most often</strong>",
+    "items": [
+      { "q": "Is Matelot self-hosted?", "a": "Yes, only. You install a cell in your own Kubernetes cluster with one Helm chart (`helm install … oci://ghcr.io/matelot-io/charts/secops-cell`). The cell contains everything: API, worker, web app, managed runners, a container registry, Postgres, Redis and Keycloak. There is no hosted edition and no component that calls home." },
+      { "q": "What do I need to run it?", "a": "A Kubernetes 1.28+ cluster with an ingress controller, TLS (cert-manager or your own certificates), a default StorageClass and about 2 vCPU / 5 GiB for a small cell. The install guide lists the values that matter; everything else has a documented default." },
+      { "q": "Where does my data live?", "a": "In the cell: your cluster, your region, your database. Backups go to a volume in the cell and, if you want, to an S3-compatible bucket you own. Nothing leaves the cell except the integrations you connect (your Git host, registries, issue tracker, chat)." },
+      { "q": "Is the source code available?", "a": "No. Matelot is closed source. Customers receive the container images and the Helm chart; both are published on GitHub Packages, signed with cosign (keyless, GitHub OIDC) and carry SBOM attestations, so you can verify what you run with the same tools Matelot uses on your software." },
+      { "q": "How does keyless registry access work?", "a": "The cell has an OIDC issuer. AWS, Azure and Google trust it through workload identity federation, so the platform exchanges short-lived identity tokens for registry access and stores no long-lived credentials. Token-based registries (Docker Hub, GHCR, any v2 registry) are supported too, with the secret encrypted at rest in your database." },
+      { "q": "What do you mean by CRA evidence?", "a": "For each release the platform produces a signed bundle with the SBOM, the known vulnerabilities at the time, the decisions and exceptions, the policies that were enforced and where the release ran. CRA readiness checks name the requirement each gap maps to, so you know what is missing before an audit does." },
+      { "q": "Do I need to run my own runners?", "a": "No. Every cell ships managed runners inside the cluster, so pipelines run on day one. Add self-hosted runner pools when jobs must reach private networks or other clusters; jobs are routed by pool and tags." },
+      { "q": "How do pipelines fit into my CI?", "a": "Your CI calls the matelot CLI with a signed, scoped CI token — never a bearer secret. Examples for GitHub Actions, GitLab CI and Bitbucket Pipelines are in the docs. Deployments are recorded the same way, and policies can reject them." },
+      { "q": "How is it priced?", "a": "Per user and month, in three tiers: Free for small teams, Premium and Ultimate billed annually. The prices on this page are indicative until the first commercial release. No licence key is needed to install today; entitlements arrive with the commercial release and existing cells keep working." },
+      { "q": "How do upgrades work?", "a": "Each release publishes the four images and the chart at the same version. `helm upgrade` with the new chart version rolls only the application pods; the database, Keycloak, Redis and the registry keep running. Release notes with image digests are on GitHub." },
+      { "q": "Can an AI assistant use it?", "a": "Yes. The MCP server exposes the API as tools, authenticated with your personal token and limited by your permissions; read-only tokens stay read-only. Claude Desktop and Claude Code snippets are generated by `matelot mcp`." }
+    ]
+  },
+  "cta": {
+    "tag": "Get started",
+    "title": "A cell in your cluster, <br><strong>this afternoon</strong>",
+    "body": "Follow the install guide, pull the chart from GitHub Packages, log in as the first administrator. Questions go to GitHub Discussions; commercial questions to sales.",
+    "primary": { "label": "Install Matelot", "href": "docs/latest/install.html" },
+    "secondary": { "label": "Talk to sales", "href": "mailto:sales@matelot.io" }
+  }
+}
