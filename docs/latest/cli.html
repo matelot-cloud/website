@@ -39,7 +39,7 @@ Path flags: <code>--org</code>, <code>--project</code>, <code>--service</code>, 
 </tr>
 <tr>
 <td><code>matelot doctor [--url URL]</code></td>
-<td>health of a cell after an install or upgrade: API ready, version, login, organization, runners online, registry; exit 1 when a check fails (<code>--json</code> for scripts)</td>
+<td>health of a cell after an install or upgrade: API ready, version, login, organization, runners online, registry; exit 1 when a check fails (<code>--json</code> for scripts). Run from the Compose folder (or <code>MATELOT_COMPOSE_DIR</code>), an unreachable API also names the container that is restarting or unhealthy and the <code>docker compose logs</code> command</td>
 </tr>
 <tr>
 <td><code>matelot pipeline --service ID [--template security] [--ref SHA] [--wait --timeout S]</code></td>
