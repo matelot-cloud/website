@@ -38,6 +38,10 @@ Path flags: <code>--org</code>, <code>--project</code>, <code>--service</code>, 
 <td>identity and permissions of the token</td>
 </tr>
 <tr>
+<td><code>matelot doctor [--url URL]</code></td>
+<td>health of a cell after an install or upgrade: API ready, version, login, organization, runners online, registry; exit 1 when a check fails (<code>--json</code> for scripts)</td>
+</tr>
+<tr>
 <td><code>matelot pipeline --service ID [--template security] [--ref SHA] [--wait --timeout S]</code></td>
 <td>run the security pipeline; non-zero exit when it fails</td>
 </tr>
