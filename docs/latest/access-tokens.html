@@ -46,14 +46,18 @@
 </tr>
 </tbody></table>
 <h2 id="personal-token-scopes"><a class="anchor" href="#personal-token-scopes">Personal token scopes</a></h2>
+<p>The scope is a mask over the user&#39;s own roles (never a different role) — the full permission × scope table is in
+<a href="roles.html#token-scopes-personal-tokens-matelot-login-claude-ai-connectors">roles.md</a>:</p>
 <ul>
-<li><strong>read</strong> — <code>GET</code>/<code>HEAD</code> only, within the user&#39;s memberships.</li>
-<li><strong>write</strong> — the full API as the user, within the user&#39;s <strong>workspace / team / project memberships</strong>.
-Organization-admin and security-admin roles and the platform admin flag are <strong>not</strong> carried.</li>
-<li><strong>sudo</strong> — administrators only: the user&#39;s full rights, including organization / platform administration.</li>
+<li><strong>read</strong> — <code>GET</code>/<code>HEAD</code> only: everything the user can see, nothing changes.</li>
+<li><strong>write</strong> (default of <code>matelot login</code>) — everything the user&#39;s roles allow <strong>except</strong> administration (organization
+settings, members and roles, integrations, policies / channels / SLAs, approvals, runner pools, compliance) and any
+<code>DELETE</code> (archiving or removing). An administrator&#39;s write token creates workspaces, teams and projects, runs
+pipelines and pushes to the registry.</li>
+<li><strong>sudo</strong> — administrators only: the user&#39;s full rights, including organization / platform administration and deletes.</li>
 </ul>
-<p>A normal user&#39;s token therefore reaches exactly the projects they are assigned to. An admin&#39;s everyday
-token behaves like a member token; admin power is opt-in per (short-lived) sudo token.</p>
+<p>A normal user&#39;s token therefore reaches exactly the projects they are assigned to; an admin&#39;s everyday token does the
+day-to-day work without being able to administer or delete, and admin power is opt-in per (short-lived) sudo token.</p>
 <h2 id="security-properties"><a class="anchor" href="#security-properties">Security properties</a></h2>
 <ul>
 <li><code>spt_</code> + 240 random bits; only the SHA-256 is stored; shown once.</li>
