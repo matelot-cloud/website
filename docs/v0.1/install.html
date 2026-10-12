@@ -13,7 +13,7 @@
 <body>
 <header class="top">
   <a class="brand" href="../../"><img src="../../assets/logo.png" alt="">Matelot<span class="dim">docs</span></a>
-  <nav class="top-links"><a href="../../">Home</a><a href="index.html">Docs</a><a class="current" href="install.html">Install</a><a href="https://github.com/matelot-io/matelot" target="_blank" rel="noopener">GitHub</a></nav>
+  <nav class="top-links"><a href="../../">Home</a><a href="index.html">Docs</a><a class="current" href="install.html">Install</a><a href="https://github.com/matelot-cloud/matelot" target="_blank" rel="noopener">GitHub</a></nav>
   <div class="search"><input id="q" type="search" placeholder="Search the docs…" autocomplete="off" aria-label="Search"><div id="results" class="results" hidden></div></div>
   <label class="version"><span class="sr-only">Version</span><select id="version" aria-label="Documentation version"><option value="v0.1">v0.1</option></select></label>
 </header>
@@ -67,7 +67,7 @@ namespace to the first administrator logged in, with backups on.</p>
 <p>Optional: an S3-compatible bucket for off-site backups, an SMTP relay for e-mail notifications, a GitHub App for
 GitHub repositories (any Git host also works with tokens).</p>
 <h2 id="2-choose-the-cell-s-values"><a class="anchor" href="#2-choose-the-cell-s-values">2. Choose the cell&#39;s values</a></h2>
-<pre><code class="language-bash">helm show values oci://ghcr.io/matelot-io/charts/secops-cell --version 0.1.0 &gt; values.yaml
+<pre><code class="language-bash">helm show values oci://ghcr.io/matelot-cloud/charts/secops-cell --version 0.1.0 &gt; values.yaml
 </code></pre>
 <p>The settings that matter for a first install:</p>
 <pre><code class="language-yaml">tenant:
@@ -97,11 +97,11 @@ backup:
   s3:                             # optional off-site copy
     enabled: false
 </code></pre>
-<p>Images are <code>ghcr.io/matelot-io/{api,worker,web,runner}</code> at the chart&#39;s <code>appVersion</code>; leave the <code>image</code> blocks alone
+<p>Images are <code>ghcr.io/matelot-cloud/{api,worker,web,runner}</code> at the chart&#39;s <code>appVersion</code>; leave the <code>image</code> blocks alone
 unless you mirror them. Everything else (replicas, resources, managed runner count, SMTP via <code>api.extraEnv</code>) has a
 documented default in <code>values.yaml</code>.</p>
 <h2 id="3-install"><a class="anchor" href="#3-install">3. Install</a></h2>
-<pre><code class="language-bash">helm install acme oci://ghcr.io/matelot-io/charts/secops-cell --version 0.1.0 \
+<pre><code class="language-bash">helm install acme oci://ghcr.io/matelot-cloud/charts/secops-cell --version 0.1.0 \
   --namespace tenant-acme --create-namespace -f values.yaml
 kubectl -n tenant-acme get pods -w
 </code></pre>
@@ -127,7 +127,7 @@ there, create a project and a service, attach a repository and run the security 
 <p>For a quick evaluation without an identity provider, <code>keycloak.seedUsers</code> creates local users (and
 <code>keycloak.allowPasswordGrant: true</code> lets the CLI log in with a password); remove both for production.</p>
 <h2 id="5-the-cli"><a class="anchor" href="#5-the-cli">5. The CLI</a></h2>
-<pre><code class="language-bash">npm install -g &quot;github:matelot-io/setup-cli#v2&quot;   # or: uses: matelot-io/setup-cli@v2 in GitHub Actions
+<pre><code class="language-bash">npm install -g &quot;github:matelot-cloud/setup-cli#v2&quot;   # or: uses: matelot-cloud/setup-cli@v2 in GitHub Actions
 matelot login --url https://acme.platform.example.com
 matelot whoami
 </code></pre>
@@ -141,20 +141,20 @@ contains the encryption key and passwords: restrict the bucket and the volume to
 matters there: the secrets must be restored <strong>before</strong> <code>helm install</code>, so the restored data can be decrypted.</p>
 <h2 id="7-upgrades"><a class="anchor" href="#7-upgrades">7. Upgrades</a></h2>
 <p>Each release ships the four images and the chart at the same version. To upgrade:</p>
-<pre><code class="language-bash">helm upgrade acme oci://ghcr.io/matelot-io/charts/secops-cell --version 0.2.0 \
+<pre><code class="language-bash">helm upgrade acme oci://ghcr.io/matelot-cloud/charts/secops-cell --version 0.2.0 \
   --namespace tenant-acme -f values.yaml
 </code></pre>
 <p>Take a backup first (the CronJob, or a manual job as above). Migrations run in the API&#39;s init container before the
 new API starts. An image release rolls only the api, worker, web and runner pods; Postgres, Keycloak, Redis and the
 registry keep running. Release notes and image digests are published with every release at
-<a href="https://github.com/matelot-io/matelot/releases" target="_blank" rel="noopener">https://github.com/matelot-io/matelot/releases</a>; images and the chart are signed with cosign (keyless, GitHub OIDC)
+<a href="https://github.com/matelot-cloud/matelot/releases" target="_blank" rel="noopener">https://github.com/matelot-cloud/matelot/releases</a>; images and the chart are signed with cosign (keyless, GitHub OIDC)
 and carry SBOM attestations.</p>
 <h2 id="8-removing-a-cell"><a class="anchor" href="#8-removing-a-cell">8. Removing a cell</a></h2>
 <pre><code class="language-bash">helm uninstall acme --namespace tenant-acme     # keeps the volumes (databases, registry, backups) and the secrets
 kubectl delete namespace tenant-acme            # removes everything
 </code></pre>
 </article>
-    <footer>Matelot documentation · v0.1 · <a href="../../">home</a> · <a href="https://github.com/matelot-io/matelot/discussions" target="_blank" rel="noopener">questions</a> · <a href="https://github.com/matelot-io/matelot/releases" target="_blank" rel="noopener">releases</a></footer>
+    <footer>Matelot documentation · v0.1 · <a href="../../">home</a> · <a href="https://github.com/matelot-cloud/matelot/discussions" target="_blank" rel="noopener">questions</a> · <a href="https://github.com/matelot-cloud/matelot/releases" target="_blank" rel="noopener">releases</a></footer>
   </main>
   <nav class="toc"><div class="toc-title">On this page</div><ul><li class="d2"><a href="#1-requirements">1. Requirements</a></li><li class="d2"><a href="#2-choose-the-cell-s-values">2. Choose the cell's values</a></li><li class="d2"><a href="#3-install">3. Install</a></li><li class="d2"><a href="#4-first-login-and-identity">4. First login and identity</a></li><li class="d2"><a href="#5-the-cli">5. The CLI</a></li><li class="d2"><a href="#6-backups">6. Backups</a></li><li class="d2"><a href="#7-upgrades">7. Upgrades</a></li><li class="d2"><a href="#8-removing-a-cell">8. Removing a cell</a></li></ul></nav>
 </div>

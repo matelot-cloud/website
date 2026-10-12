@@ -13,7 +13,7 @@
 <body>
 <header class="top">
   <a class="brand" href="../../"><img src="../../assets/logo.png" alt="">Matelot<span class="dim">docs</span></a>
-  <nav class="top-links"><a href="../../">Home</a><a class="current" href="index.html">Docs</a><a href="install.html">Install</a><a href="https://github.com/matelot-io/matelot" target="_blank" rel="noopener">GitHub</a></nav>
+  <nav class="top-links"><a href="../../">Home</a><a class="current" href="index.html">Docs</a><a href="install.html">Install</a><a href="https://github.com/matelot-cloud/matelot" target="_blank" rel="noopener">GitHub</a></nav>
   <div class="search"><input id="q" type="search" placeholder="Search the docs…" autocomplete="off" aria-label="Search"><div id="results" class="results" hidden></div></div>
   <label class="version"><span class="sr-only">Version</span><select id="version" aria-label="Documentation version"><option value="v0.1">v0.1</option></select></label>
 </header>
@@ -37,10 +37,10 @@ at creation and stored encrypted with the cell key.</p>
 and <code>secret</code> into your CI secrets (<code>MATELOT_KEY_ID</code>, <code>MATELOT_SECRET</code>).</p>
 <h2 id="use-it"><a class="anchor" href="#use-it">Use it</a></h2>
 <p><strong>The CLI</strong> (<code>matelot</code>, source <code>apps/cli</code>, published as the public repository
-<a href="https://github.com/matelot-io/setup-cli" target="_blank" rel="noopener">matelot-io/setup-cli</a>; Node ≥ 18, no dependencies): install it with
-<code>npm install -g &quot;github:matelot-io/setup-cli#v2&quot;</code> (<code>#v2</code> follows the current major; <code>#v2.19.2</code> pins a release), or in
+<a href="https://github.com/matelot-cloud/setup-cli" target="_blank" rel="noopener">matelot-cloud/setup-cli</a>; Node ≥ 18, no dependencies): install it with
+<code>npm install -g &quot;github:matelot-cloud/setup-cli#v2&quot;</code> (<code>#v2</code> follows the current major; <code>#v2.19.2</code> pins a release), or in
 GitHub Actions use the same repository as an action, which installs the CLI at that tag and exports the variables:</p>
-<pre><code class="language-yaml">- uses: matelot-io/setup-cli@v2   # or @v2.19.2
+<pre><code class="language-yaml">- uses: matelot-cloud/setup-cli@v2   # or @v2.19.2
   with:
     url: ${{ vars.MATELOT_URL }}
     key-id: ${{ secrets.MATELOT_KEY_ID }}
@@ -130,7 +130,7 @@ ACR — role <code>AcrPull</code> (+ <code>AcrPush</code>).</p>
 <h2 id="installing-the-cli-in-ci"><a class="anchor" href="#installing-the-cli-in-ci">Installing the CLI in CI</a></h2>
 <p>The CLI reads <code>MATELOT_URL</code>, <code>MATELOT_KEY_ID</code>, <code>MATELOT_SECRET</code> (CI token) or <code>MATELOT_TOKEN</code> (personal token), and
 <code>MATELOT_COMMIT</code> for <code>deploy</code>. The old <code>SECOPS_*</code> names are still accepted as a fallback.</p>
-<p>Runners without access to github.com (air-gapped CI): <code>npm pack</code> in a clone of <code>matelot-io/setup-cli</code> produces
+<p>Runners without access to github.com (air-gapped CI): <code>npm pack</code> in a clone of <code>matelot-cloud/setup-cli</code> produces
 <code>matelot-cli-&lt;version&gt;.tgz</code>; host it on an internal artifact store or npm registry (Verdaccio, Artifactory, GitHub
 Packages) and <code>npm install -g</code> from there. GitLab CI and Bitbucket Pipelines examples (<code>examples/</code>) install from the
 repository the same way.</p>
@@ -198,7 +198,7 @@ Scripts that tested for <code>3</code> to detect a bad token must test for <code
 </tbody></table>
 <p>Rebuild the runner image after this release (<code>docker build apps/runner</code>) so <code>semgrep</code> is present; a runner without it reports the code job as skipped with that reason.</p>
 </article>
-    <footer>Matelot documentation · v0.1 · <a href="../../">home</a> · <a href="https://github.com/matelot-io/matelot/discussions" target="_blank" rel="noopener">questions</a> · <a href="https://github.com/matelot-io/matelot/releases" target="_blank" rel="noopener">releases</a></footer>
+    <footer>Matelot documentation · v0.1 · <a href="../../">home</a> · <a href="https://github.com/matelot-cloud/matelot/discussions" target="_blank" rel="noopener">questions</a> · <a href="https://github.com/matelot-cloud/matelot/releases" target="_blank" rel="noopener">releases</a></footer>
   </main>
   <nav class="toc"><div class="toc-title">On this page</div><ul><li class="d2"><a href="#create-a-token">Create a token</a></li><li class="d2"><a href="#use-it">Use it</a></li><li class="d2"><a href="#network">Network</a></li><li class="d2"><a href="#built-in-registry">Built-in registry</a></li><li class="d2"><a href="#external-registries-docker-hub-ghcr-gitlab-harbor">External registries (Docker Hub, GHCR, GitLab, Harbor…)</a></li><li class="d2"><a href="#aws-ecr-and-azure-container-registry">AWS ECR and Azure Container Registry</a></li><li class="d2"><a href="#installing-the-cli-in-ci">Installing the CLI in CI</a></li><li class="d2"><a href="#gate-timing-in-ci-wait-for-correlation">Gate timing in CI: wait for correlation</a></li><li class="d2"><a href="#pipeline-jobs">Pipeline jobs</a></li></ul></nav>
 </div>
