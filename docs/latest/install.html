@@ -127,7 +127,7 @@ there, create a project and a service, attach a repository and run the security 
 <p>For a quick evaluation without an identity provider, <code>keycloak.seedUsers</code> creates local users (and
 <code>keycloak.allowPasswordGrant: true</code> lets the CLI log in with a password); remove both for production.</p>
 <h2 id="5-the-cli"><a class="anchor" href="#5-the-cli">5. The CLI</a></h2>
-<pre><code class="language-bash">npm install -g secops-platform-cli
+<pre><code class="language-bash">npm install -g &quot;github:matelot-io/setup-cli#v2&quot;   # or: uses: matelot-io/setup-cli@v2 in GitHub Actions
 matelot login --url https://acme.platform.example.com
 matelot whoami
 </code></pre>
