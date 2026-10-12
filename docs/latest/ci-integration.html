@@ -37,9 +37,14 @@ at creation and stored encrypted with the cell key.</p>
 and <code>secret</code> into your CI secrets (<code>MATELOT_KEY_ID</code>, <code>MATELOT_SECRET</code>).</p>
 <h2 id="use-it"><a class="anchor" href="#use-it">Use it</a></h2>
 <p><strong>The CLI</strong> (<code>matelot</code>, source <code>apps/cli</code>, published as the public repository
-<a href="https://github.com/matelot-cloud/setup-cli" target="_blank" rel="noopener">matelot-cloud/setup-cli</a>; Node ≥ 18, no dependencies): install it with
-<code>npm install -g &quot;github:matelot-cloud/setup-cli#v2&quot;</code> (<code>#v2</code> follows the current major; <code>#v2.19.2</code> pins a release), or in
-GitHub Actions use the same repository as an action, which installs the CLI at that tag and exports the variables:</p>
+<a href="https://github.com/matelot-cloud/setup-cli" target="_blank" rel="noopener">matelot-cloud/setup-cli</a>; Node ≥ 18, no dependencies, no build on install).
+Every CLI release attaches the npm package to a GitHub Release there:</p>
+<pre><code class="language-bash">npm install -g https://github.com/matelot-cloud/setup-cli/releases/latest/download/matelot-cli.tgz          # newest release
+npm install -g https://github.com/matelot-cloud/setup-cli/releases/download/v2.19.2/matelot-cli-2.19.2.tgz  # pinned
+</code></pre>
+<p>Do not install with the <code>github:&lt;owner&gt;/&lt;repo&gt;</code> git form: npm 10 links such an install to its temporary clone
+and then deletes it, so <code>matelot</code> ends up as a dangling symlink. In GitHub Actions use the same repository as an
+action, which installs the CLI at the tag it was used with and exports the variables:</p>
 <pre><code class="language-yaml">- uses: matelot-cloud/setup-cli@v2   # or @v2.19.2
   with:
     url: ${{ vars.MATELOT_URL }}
@@ -130,10 +135,9 @@ ACR — role <code>AcrPull</code> (+ <code>AcrPush</code>).</p>
 <h2 id="installing-the-cli-in-ci"><a class="anchor" href="#installing-the-cli-in-ci">Installing the CLI in CI</a></h2>
 <p>The CLI reads <code>MATELOT_URL</code>, <code>MATELOT_KEY_ID</code>, <code>MATELOT_SECRET</code> (CI token) or <code>MATELOT_TOKEN</code> (personal token), and
 <code>MATELOT_COMMIT</code> for <code>deploy</code>. The old <code>SECOPS_*</code> names are still accepted as a fallback.</p>
-<p>Runners without access to github.com (air-gapped CI): <code>npm pack</code> in a clone of <code>matelot-cloud/setup-cli</code> produces
-<code>matelot-cli-&lt;version&gt;.tgz</code>; host it on an internal artifact store or npm registry (Verdaccio, Artifactory, GitHub
-Packages) and <code>npm install -g</code> from there. GitLab CI and Bitbucket Pipelines examples (<code>examples/</code>) install from the
-repository the same way.</p>
+<p>Runners without access to github.com (air-gapped CI): download <code>matelot-cli-&lt;version&gt;.tgz</code> from the release once,
+host it on an internal artifact store or npm registry (Verdaccio, Artifactory, GitHub Packages) and <code>npm install -g</code>
+from there. The GitLab CI and Bitbucket Pipelines examples (<code>examples/</code>) install from the release URL.</p>
 <p>The GitHub Action is a thin wrapper around the install; replace its <code>uses:</code> step with a <code>run: npm install -g …</code> line plus
 the three environment variables when the action is not reachable.</p>
 <h2 id="gate-timing-in-ci-wait-for-correlation"><a class="anchor" href="#gate-timing-in-ci-wait-for-correlation">Gate timing in CI: wait for correlation</a></h2>
