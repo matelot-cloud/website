@@ -31,12 +31,12 @@
   "hero": {
     "badge": "Self-hosted · one cell per organization",
     "title": "Know what you ship,<br><em>prove it is secure</em>",
-    "subtitle": "Matelot keeps a live picture of every product, service, release and deployment: what is in it, which vulnerabilities reach production, which policies apply, and the evidence the Cyber Resilience Act expects. It runs in your own Kubernetes cluster from one Helm chart, so your code, SBOMs and findings never leave your infrastructure.",
-    "primary": { "label": "Install Matelot", "href": "docs/latest/install.html" },
+    "subtitle": "Matelot keeps a live picture of every product, service, release and deployment: what is in it, which vulnerabilities reach production, which policies apply, and the evidence the Cyber Resilience Act expects. It runs on your own infrastructure — one `docker compose up` on a single host, or a Helm chart in your Kubernetes cluster — so your code, SBOMs and findings never leave it.",
+    "primary": { "label": "Start free — Docker Compose", "href": "docs/latest/install.html#option-a-docker-compose" },
     "secondary": { "label": "Read the docs", "href": "docs/latest/" },
     "metrics": [
       { "value": "1", "suffix": " cell", "label": "per organization: your cluster, your database, your identity realm" },
-      { "value": "4", "suffix": " images", "label": "plus one Helm chart — signed, with SBOM attestations, pulled from GitHub Packages" },
+      { "value": "5", "suffix": " minutes", "label": "from `docker compose up -d` to the first login on a 4 GB host; Helm for production" },
       { "value": "0", "suffix": " secrets", "label": "stored for keyless registry access on AWS, Azure and Google" }
     ]
   },
@@ -117,7 +117,7 @@
         "billing": "forever",
         "description": "A small team getting its products under control.",
         "features": ["Full platform: SBOM, pipelines, policies and gates, CRA readiness", "Up to 5 users", "Managed runners in the cell", "Community support in GitHub Discussions"],
-        "cta": { "label": "Install now", "href": "docs/latest/install.html" },
+        "cta": { "label": "Start free", "href": "docs/latest/install.html#option-a-docker-compose" },
         "featured": false
       },
       {
@@ -150,8 +150,8 @@
     "tag": "Frequently asked",
     "title": "Questions we hear <strong>most often</strong>",
     "items": [
-      { "q": "Is Matelot self-hosted?", "a": "Yes, only. You install a cell in your own Kubernetes cluster with one Helm chart (`helm install … oci://ghcr.io/{{org}}/charts/secops-cell`). The cell contains everything: API, worker, web app, managed runners, a container registry, Postgres, Redis and Keycloak. There is no hosted edition and no component that calls home." },
-      { "q": "What do I need to run it?", "a": "A Kubernetes 1.28+ cluster with an ingress controller, TLS (cert-manager or your own certificates), a default StorageClass and about 2 vCPU / 5 GiB for a small cell. The install guide lists the values that matter; everything else has a documented default." },
+      { "q": "Is Matelot self-hosted?", "a": "Yes, only. Start with Docker Compose on one host (`docker compose up -d`, five minutes, automatic HTTPS with a domain) or install the Helm chart in your Kubernetes cluster for production. A cell contains everything: API, worker, web app, managed runner, a container registry, Postgres, Redis and Keycloak. There is no hosted edition and no component that calls home." },
+      { "q": "What do I need to run it?", "a": "Docker Compose: Docker 24+ with Compose v2, 2 vCPU and 4 GB on one host, a DNS name if you want HTTPS. Kubernetes: a 1.28+ cluster with an ingress controller, TLS (cert-manager or your own certificates) and a default StorageClass. A Compose backup restores into a Helm cell, so you can start small and move later." },
       { "q": "Where does my data live?", "a": "In the cell: your cluster, your region, your database. Backups go to a volume in the cell and, if you want, to an S3-compatible bucket you own. Nothing leaves the cell except the integrations you connect (your Git host, registries, issue tracker, chat)." },
       { "q": "Is the source code available?", "a": "No. Matelot is closed source. Customers receive the container images and the Helm chart; both are published on GitHub Packages, signed with cosign (keyless, GitHub OIDC) and carry SBOM attestations, so you can verify what you run with the same tools Matelot uses on your software." },
       { "q": "How does keyless registry access work?", "a": "The cell has an OIDC issuer. AWS, Azure and Google trust it through workload identity federation, so the platform exchanges short-lived identity tokens for registry access and stores no long-lived credentials. Token-based registries (Docker Hub, GHCR, any v2 registry) are supported too, with the secret encrypted at rest in your database." },
@@ -166,8 +166,8 @@
   "cta": {
     "tag": "Get started",
     "title": "A cell in your cluster, <br><strong>this afternoon</strong>",
-    "body": "Follow the install guide, pull the chart from GitHub Packages, log in as the first administrator. Questions go to GitHub Discussions; commercial questions to sales.",
-    "primary": { "label": "Install Matelot", "href": "docs/latest/install.html" },
+    "body": "Copy the compose file, `docker compose up -d`, log in as the first administrator — or install the Helm chart in your cluster. Questions go to GitHub Discussions; commercial questions to sales.",
+    "primary": { "label": "Start free", "href": "docs/latest/install.html#option-a-docker-compose" },
     "secondary": { "label": "Talk to sales", "href": "mailto:sales@matelot.io" }
   }
 }

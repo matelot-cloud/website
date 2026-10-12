@@ -1,12 +1,17 @@
 # Builds the landing page + the committed documentation folders and publishes them to GitHub Pages.
 # Runs on every push to main (including the pushes made by the platform's release / docs-sync workflows).
-# One-time setup: Settings → Pages → Source: "GitHub Actions". Custom domain: the repository variable SITE_DOMAIN
-# (Settings → Secrets and variables → Actions → Variables), e.g. `matelot.io`; empty = https://matelot-cloud.github.io/website.
+# Pages source must be "GitHub Actions": the deploy job sets it (build_type=workflow) before every deploy, because GitHub
+# resets it to the legacy branch build on its own (seen twice after the custom domain was written) and the site then
+# shows the README. Custom domain: the repository variable SITE_DOMAIN (Settings → Secrets and variables → Actions →
+# Variables), e.g. `matelot.cloud`; empty = https://matelot-cloud.github.io/website. The platform's docs-sync and release
+# workflows also fire the repository_dispatch below after pushing docs, so the source is healed even without a commit.
 name: pages
 on:
   push:
     branches: [main]
   workflow_dispatch:
+  repository_dispatch:
+    types: [docs-synced]   # sent by the platform's docs-sync / release workflows
 
 permissions:
   contents: read
@@ -40,5 +45,17 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Pages source is "GitHub Actions" (self-healing; GitHub resets it to the branch build by itself)
+        env:
+          # GITHUB_TOKEN with `pages: write` can change the Pages build type; PAGES_ADMIN_TOKEN (optional repository
+          # secret: a PAT with Pages read/write on this repository) is used when it is set
+          GH_TOKEN: ${{ secrets.PAGES_ADMIN_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          current="$(gh api "repos/${{ github.repository }}/pages" --jq '.build_type' 2>/dev/null || echo none)"
+          if [ "$current" = workflow ]; then echo "pages source: GitHub Actions (ok)"; exit 0; fi
+          echo "pages source was '$current': setting build_type=workflow"
+          gh api -X PUT "repos/${{ github.repository }}/pages" -f build_type=workflow > /dev/null \
+            || gh api -X POST "repos/${{ github.repository }}/pages" -f build_type=workflow > /dev/null   # site not created yet
+          gh api "repos/${{ github.repository }}/pages" --jq '"pages source now: " + .build_type + " · domain: " + (.cname // "none")'
       - id: deployment
         uses: actions/deploy-pages@v5

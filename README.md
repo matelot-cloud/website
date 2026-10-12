@@ -24,10 +24,21 @@ npx serve dist          # or: python3 -m http.server -d dist 8080
 
 Node 22, no dependencies to install.
 
+## GitHub Pages source — the only supported setting is "GitHub Actions"
+
+Settings → Pages → Source must be **GitHub Actions** (`build_type=workflow`). GitHub resets it to the legacy branch
+build (`main`, root) on its own in some situations — observed twice right after the custom domain was saved — and the
+site then shows this README instead of the landing page. `pages.yml` heals it: the deploy job reads the setting and
+puts `build_type=workflow` back before every deploy, on each push to `main`, on manual runs, and on the
+`docs-synced` dispatch the platform's `docs-sync` / `release` workflows send after pushing docs. If the healing step is
+refused (403), add a repository secret `PAGES_ADMIN_TOKEN` (fine-grained PAT, Pages: read and write on this repository);
+the step prefers it over `GITHUB_TOKEN`. **Do not edit the custom domain in the Pages UI** — set `SITE_DOMAIN` (below)
+and let the build write `CNAME`; a UI edit is what resets the source.
+
 ## Custom domain
 
 One setting: the repository variable **`SITE_DOMAIN`** (Settings → Secrets and variables → Actions → Variables).
-Empty (the default) builds for `https://matelot-cloud.github.io/website`. Set it to `matelot.io` once the DNS points at
+Empty (the default) builds for `https://matelot-cloud.github.io/website`. Set it to `matelot.cloud` once the DNS points at
 GitHub Pages (`A`/`AAAA` records for the apex, or a `CNAME` to `matelot-cloud.github.io`), and the build writes the
 `CNAME` file, the sitemap and the social-preview URLs for that domain; also enter the domain under Settings → Pages so
 GitHub provisions the certificate. Links inside the site are relative, so nothing else changes.

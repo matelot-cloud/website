@@ -52,6 +52,11 @@
 wildcard certificate <code>*.secops.example.com</code> (or cert-manager per host) covers all three, because every
 name is a single level under the domain. The Helm chart derives all URLs from <code>tenant.slug</code> and
 <code>tenant.domain</code>: token realm, registry notifications, OIDC issuer, <code>WEB_BASE_URL</code>, GitHub App callback.</p>
+<p>On the app host, <code>/api/*</code> and <code>/.well-known/*</code> (OAuth/OIDC discovery for <code>matelot login</code> and MCP clients) go to the
+API, everything else to the web app; a Docker Compose cell serves Keycloak under <code>/auth</code> on the same host and the
+registry on <code>registry.&lt;domain&gt;</code> (or <code>localhost:5000</code>). Unauthenticated endpoints an operator can probe:
+<code>GET /api/v1/health/live</code>, <code>GET /api/v1/health/ready</code> (database reachable) and <code>GET /api/v1/version</code>
+(<code>{&quot;name&quot;:&quot;matelot&quot;,&quot;version&quot;:&quot;0.1.0&quot;}</code> — what <code>matelot doctor</code> shows before login).</p>
 <p>Provisioning a cell therefore needs from the operator: three DNS records (or a wildcard), a TLS
 issuer, and <code>helm install</code> (M12 automates this in the cell provisioning flow). Nothing about ports or
 hostnames is configured by teams: the UI, the CI snippets and the CLI print the cell&#39;s real URLs.</p>

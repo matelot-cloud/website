@@ -47,8 +47,8 @@ assert.ok(!existsSync(join(out, 'timer.html')), 'timer.html must not ship');
 
 // 2. custom domain: CNAME and absolute URLs follow SITE_DOMAIN
 const out2 = mkdtempSync(join(tmpdir(), 'site-'));
-execFileSync('node', [join(here, 'build.mjs'), '--out', out2], { stdio: 'pipe', env: { ...process.env, SITE_DOMAIN: 'matelot.io' } });
-assert.equal(readFileSync(join(out2, 'CNAME'), 'utf8'), 'matelot.io\n');
-assert.match(readFileSync(join(out2, 'sitemap.xml'), 'utf8'), /<loc>https:\/\/matelot\.io\/<\/loc>/);
-assert.match(readFileSync(join(out2, 'robots.txt'), 'utf8'), /https:\/\/matelot\.io\/sitemap\.xml/);
+execFileSync('node', [join(here, 'build.mjs'), '--out', out2], { stdio: 'pipe', env: { ...process.env, SITE_DOMAIN: 'matelot.cloud' } });
+assert.equal(readFileSync(join(out2, 'CNAME'), 'utf8'), 'matelot.cloud\n');
+assert.match(readFileSync(join(out2, 'sitemap.xml'), 'utf8'), /<loc>https:\/\/matelot\.cloud\/<\/loc>/);
+assert.match(readFileSync(join(out2, 'robots.txt'), 'utf8'), /https:\/\/matelot\.cloud\/sitemap\.xml/);
 console.log(`site ok (landing + ${pages.length} docs pages, versions: ${versions.join(', ')})`);
