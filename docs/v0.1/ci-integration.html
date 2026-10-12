@@ -36,10 +36,11 @@ at creation and stored encrypted with the cell key.</p>
 <em>Run security pipelines and gates</em>, <em>Everything a pipeline can do</em>), optional expiry → copy <code>keyId</code>
 and <code>secret</code> into your CI secrets (<code>MATELOT_KEY_ID</code>, <code>MATELOT_SECRET</code>).</p>
 <h2 id="use-it"><a class="anchor" href="#use-it">Use it</a></h2>
-<p><strong>npm package <code>secops-platform-cli</code></strong> (source: <code>apps/cli</code>, published from
-<code>github.com/dev-testing-secops-platform/secops-platform-cli</code>; Node ≥ 18): <code>npx secops-platform-cli deploy …</code>, or
-in GitHub Actions the repository&#39;s action, which installs it and exports the variables:</p>
-<pre><code class="language-yaml">- uses: dev-testing-secops-platform/secops-platform-cli@main   # or @v2.6.0
+<p><strong>The CLI</strong> (<code>matelot</code>, source <code>apps/cli</code>, published as the public repository
+<a href="https://github.com/matelot-io/setup-cli" target="_blank" rel="noopener">matelot-io/setup-cli</a>; Node ≥ 18, no dependencies): install it with
+<code>npm install -g &quot;github:matelot-io/setup-cli#v2&quot;</code> (<code>#v2</code> follows the current major; <code>#v2.19.2</code> pins a release), or in
+GitHub Actions use the same repository as an action, which installs the CLI at that tag and exports the variables:</p>
+<pre><code class="language-yaml">- uses: matelot-io/setup-cli@v2   # or @v2.19.2
   with:
     url: ${{ vars.MATELOT_URL }}
     key-id: ${{ secrets.MATELOT_KEY_ID }}
@@ -129,14 +130,10 @@ ACR — role <code>AcrPull</code> (+ <code>AcrPush</code>).</p>
 <h2 id="installing-the-cli-in-ci"><a class="anchor" href="#installing-the-cli-in-ci">Installing the CLI in CI</a></h2>
 <p>The CLI reads <code>MATELOT_URL</code>, <code>MATELOT_KEY_ID</code>, <code>MATELOT_SECRET</code> (CI token) or <code>MATELOT_TOKEN</code> (personal token), and
 <code>MATELOT_COMMIT</code> for <code>deploy</code>. The old <code>SECOPS_*</code> names are still accepted as a fallback.</p>
-<p><code>dev-testing-secops-platform/secops-platform-cli</code> is a private repository, so <code>uses: …@main</code> and
-<code>npm install -g github:…</code> only work for runners that can read it. For other organizations, pick one:</p>
-<ul>
-<li><strong>Package tarball</strong>: <code>npm pack</code> in the CLI repository produces <code>matelot-cli-&lt;version&gt;.tgz</code>; host it where runners can
-download it (an internal artifact store, a release asset) and install with <code>npm install -g &lt;url-or-path&gt;.tgz</code>.</li>
-<li><strong>Internal npm registry</strong> (Verdaccio, Artifactory, GitHub Packages): <code>npm publish</code> there, then <code>npm install -g matelot-cli</code>.</li>
-<li><strong>Public npm</strong>: once the package name is decided and published, <code>npm install -g &lt;name&gt;</code> works everywhere.</li>
-</ul>
+<p>Runners without access to github.com (air-gapped CI): <code>npm pack</code> in a clone of <code>matelot-io/setup-cli</code> produces
+<code>matelot-cli-&lt;version&gt;.tgz</code>; host it on an internal artifact store or npm registry (Verdaccio, Artifactory, GitHub
+Packages) and <code>npm install -g</code> from there. GitLab CI and Bitbucket Pipelines examples (<code>examples/</code>) install from the
+repository the same way.</p>
 <p>The GitHub Action is a thin wrapper around the install; replace its <code>uses:</code> step with a <code>run: npm install -g …</code> line plus
 the three environment variables when the action is not reachable.</p>
 <h2 id="gate-timing-in-ci-wait-for-correlation"><a class="anchor" href="#gate-timing-in-ci-wait-for-correlation">Gate timing in CI: wait for correlation</a></h2>
