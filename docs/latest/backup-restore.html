@@ -13,7 +13,7 @@
 <body>
 <header class="top">
   <a class="brand" href="../../"><img src="../../assets/logo.png" alt="">Matelot<span class="dim">docs</span></a>
-  <nav class="top-links"><a href="../../">Home</a><a class="current" href="index.html">Docs</a><a href="install.html">Install</a><a href="https://github.com/matelot-io/matelot" target="_blank" rel="noopener">GitHub</a></nav>
+  <nav class="top-links"><a href="../../">Home</a><a class="current" href="index.html">Docs</a><a href="install.html">Install</a><a href="https://github.com/matelot-cloud/matelot" target="_blank" rel="noopener">GitHub</a></nav>
   <div class="search"><input id="q" type="search" placeholder="Search the docs…" autocomplete="off" aria-label="Search"><div id="results" class="results" hidden></div></div>
   <label class="version"><span class="sr-only">Version</span><select id="version" aria-label="Documentation version"><option value="latest">latest</option></select></label>
 </header>
@@ -30,7 +30,7 @@ backup without the key restores a cell whose connections all say &quot;cannot de
 <p>The chart ships a scheduled backup that captures all three into one archive; two operator scripts run a backup on
 demand, download archives and restore them.</p>
 <p><strong>Where the scripts are.</strong> <code>scripts/cell-backup.sh</code> and <code>scripts/cell-restore.sh</code> are in the <code>scripts/</code> folder of
-<a href="https://github.com/matelot-io/helm-charts" target="_blank" rel="noopener">matelot-io/helm-charts</a> (next to the chart; they only need <code>kubectl</code>,
+<a href="https://github.com/matelot-cloud/helm-charts" target="_blank" rel="noopener">matelot-cloud/helm-charts</a> (next to the chart; they only need <code>kubectl</code>,
 <code>helm</code>, <code>bash</code> and <code>python3</code>). The <code>make backup TENANT=acme</code> / <code>make restore …</code> shorthands used on this page are the
 platform repository&#39;s Makefile and expand to <code>scripts/cell-backup.sh -r acme -n tenant-acme -d ./backups</code> and
 <code>scripts/cell-restore.sh -r acme -n tenant-acme ARCHIVE</code>; <code>make deploy</code> stands for <code>helm upgrade --install</code>.</p>
@@ -162,7 +162,7 @@ namespace (the PVCs are kept on uninstall by design).</p>
 </tr>
 </tbody></table>
 </article>
-    <footer>Matelot documentation · latest · <a href="../../">home</a> · <a href="https://github.com/matelot-io/matelot/discussions" target="_blank" rel="noopener">questions</a> · <a href="https://github.com/matelot-io/matelot/releases" target="_blank" rel="noopener">releases</a></footer>
+    <footer>Matelot documentation · latest · <a href="../../">home</a> · <a href="https://github.com/matelot-cloud/matelot/discussions" target="_blank" rel="noopener">questions</a> · <a href="https://github.com/matelot-cloud/matelot/releases" target="_blank" rel="noopener">releases</a></footer>
   </main>
   <nav class="toc"><div class="toc-title">On this page</div><ul><li class="d2"><a href="#what-is-in-an-archive">What is in an archive</a></li><li class="d2"><a href="#turning-backups-on">Turning backups on</a></li><li class="d2"><a href="#restoring">Restoring</a></li><li class="d3"><a href="#case-1-roll-back-the-data-of-a-running-cell">Case 1: roll back the data of a running cell</a></li><li class="d3"><a href="#case-2-rebuild-the-cell-on-a-new-cluster-disaster-recovery">Case 2: rebuild the cell on a new cluster (disaster recovery)</a></li><li class="d3"><a href="#case-3-external-database">Case 3: external database</a></li><li class="d3"><a href="#after-any-restore">After any restore</a></li><li class="d2"><a href="#testing-the-backup">Testing the backup</a></li><li class="d2"><a href="#reference">Reference</a></li></ul></nav>
 </div>

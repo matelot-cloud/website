@@ -13,7 +13,7 @@
 <body>
 <header class="top">
   <a class="brand" href="../../"><img src="../../assets/logo.png" alt="">Matelot<span class="dim">docs</span></a>
-  <nav class="top-links"><a href="../../">Home</a><a class="current" href="index.html">Docs</a><a href="install.html">Install</a><a href="https://github.com/matelot-io/matelot" target="_blank" rel="noopener">GitHub</a></nav>
+  <nav class="top-links"><a href="../../">Home</a><a class="current" href="index.html">Docs</a><a href="install.html">Install</a><a href="https://github.com/matelot-cloud/matelot" target="_blank" rel="noopener">GitHub</a></nav>
   <div class="search"><input id="q" type="search" placeholder="Search the docs…" autocomplete="off" aria-label="Search"><div id="results" class="results" hidden></div></div>
   <label class="version"><span class="sr-only">Version</span><select id="version" aria-label="Documentation version"><option value="latest">latest</option></select></label>
 </header>
@@ -54,7 +54,7 @@ run on managed runners.</li>
 <pre><code class="language-yaml">managedRunners:
   enabled: true        # false removes the StatefulSet (the Secret is kept)
   replicas: 1          # 0 stops them
-  image: { repository: ghcr.io/matelot-io/runner, tag: &quot;&quot; }   # tag defaults to the chart appVersion
+  image: { repository: ghcr.io/matelot-cloud/runner, tag: &quot;&quot; }   # tag defaults to the chart appVersion
   tags: []
   secret: &quot;&quot;           # empty = generated and kept
   resources: { requests: { cpu: 250m, memory: 512Mi }, limits: { cpu: &quot;2&quot;, memory: 2Gi } }
@@ -64,7 +64,7 @@ run on managed runners.</li>
 <p>Without the chart (local development): start the API with <code>MANAGED_RUNNER_SECRET=&lt;48 chars&gt;</code> and a runner with
 <code>RUNNER_URL=… RUNNER_MANAGED_SECRET=&lt;same&gt; RUNNER_NAME=managed-0 node apps/runner/dist/index.js</code>.</p>
 </article>
-    <footer>Matelot documentation · latest · <a href="../../">home</a> · <a href="https://github.com/matelot-io/matelot/discussions" target="_blank" rel="noopener">questions</a> · <a href="https://github.com/matelot-io/matelot/releases" target="_blank" rel="noopener">releases</a></footer>
+    <footer>Matelot documentation · latest · <a href="../../">home</a> · <a href="https://github.com/matelot-cloud/matelot/discussions" target="_blank" rel="noopener">questions</a> · <a href="https://github.com/matelot-cloud/matelot/releases" target="_blank" rel="noopener">releases</a></footer>
   </main>
   <nav class="toc"><div class="toc-title">On this page</div><ul><li class="d2"><a href="#how-it-works">How it works</a></li><li class="d2"><a href="#helm-values">Helm values</a></li></ul></nav>
 </div>
