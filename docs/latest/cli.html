@@ -38,6 +38,10 @@ Path flags: <code>--org</code>, <code>--project</code>, <code>--service</code>, 
 <td>identity and permissions of the token</td>
 </tr>
 <tr>
+<td><code>matelot cells</code> / <code>matelot use URL</code></td>
+<td>stored logins (URL, user, scope, expiry) with the current one marked; <code>use</code> targets one. Every command resolves its cell as <code>--url</code> &gt; <code>MATELOT_URL</code> &gt; the current cell (set by the last <code>login</code> or <code>use</code>) &gt; the only stored login; with several stored logins and none current it stops with &quot;no cell selected&quot; instead of guessing</td>
+</tr>
+<tr>
 <td><code>matelot doctor [--url URL]</code></td>
 <td>health of a cell after an install or upgrade: API ready, version, OAuth discovery (JSON, endpoints on the cell&#39;s own URL), login, organization, runners online, registry; exit 1 when a check fails (<code>--json</code> for scripts). Run from the Compose folder (or <code>MATELOT_COMPOSE_DIR</code>), an unreachable API also names the container that is restarting or unhealthy and the <code>docker compose logs</code> command</td>
 </tr>
