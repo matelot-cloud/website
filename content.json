@@ -1,20 +1,21 @@
 {
   "product": "Matelot",
+  "org": "matelot-cloud",
   "tagline": "Product security for the software you ship — self-hosted",
   "brandTag": "Self-hosted product security",
   "site": {
-    "url": "https://matelot-io.github.io/website",
+    "url": "https://{{org}}.github.io/website",
     "title": "Matelot — product security, DevSecOps and CRA compliance, self-hosted in your cluster",
     "description": "SBOMs, vulnerability correlation, policies and gates, keyless registries, managed runners and CRA evidence. One Helm chart, one cell per organization, in your own Kubernetes cluster.",
-    "github": "https://github.com/matelot-io/matelot",
-    "helmChart": "https://github.com/matelot-io/helm-charts",
+    "github": "https://github.com/{{org}}/matelot",
+    "helmChart": "https://github.com/{{org}}/helm-charts",
     "security": "security@matelot.io",
     "sales": "sales@matelot.io",
     "footerLinks": [
       { "label": "Documentation", "href": "docs/latest/" },
       { "label": "Install", "href": "docs/latest/install.html" },
-      { "label": "Helm chart", "href": "https://github.com/matelot-io/helm-charts" },
-      { "label": "GitHub", "href": "https://github.com/matelot-io/matelot" },
+      { "label": "Helm chart", "href": "https://github.com/{{org}}/helm-charts" },
+      { "label": "GitHub", "href": "https://github.com/{{org}}/matelot" },
       { "label": "Security", "href": "mailto:security@matelot.io" },
       { "label": "Sales", "href": "mailto:sales@matelot.io" }
     ]
@@ -25,7 +26,7 @@
     { "label": "FAQ", "href": "#faq" },
     { "label": "Docs", "href": "docs/latest/" },
     { "label": "Install", "href": "docs/latest/install.html" },
-    { "label": "GitHub", "href": "https://github.com/matelot-io/matelot" }
+    { "label": "GitHub", "href": "https://github.com/{{org}}/matelot" }
   ],
   "hero": {
     "badge": "Self-hosted · one cell per organization",
@@ -149,7 +150,7 @@
     "tag": "Frequently asked",
     "title": "Questions we hear <strong>most often</strong>",
     "items": [
-      { "q": "Is Matelot self-hosted?", "a": "Yes, only. You install a cell in your own Kubernetes cluster with one Helm chart (`helm install … oci://ghcr.io/matelot-io/charts/secops-cell`). The cell contains everything: API, worker, web app, managed runners, a container registry, Postgres, Redis and Keycloak. There is no hosted edition and no component that calls home." },
+      { "q": "Is Matelot self-hosted?", "a": "Yes, only. You install a cell in your own Kubernetes cluster with one Helm chart (`helm install … oci://ghcr.io/{{org}}/charts/secops-cell`). The cell contains everything: API, worker, web app, managed runners, a container registry, Postgres, Redis and Keycloak. There is no hosted edition and no component that calls home." },
       { "q": "What do I need to run it?", "a": "A Kubernetes 1.28+ cluster with an ingress controller, TLS (cert-manager or your own certificates), a default StorageClass and about 2 vCPU / 5 GiB for a small cell. The install guide lists the values that matter; everything else has a documented default." },
       { "q": "Where does my data live?", "a": "In the cell: your cluster, your region, your database. Backups go to a volume in the cell and, if you want, to an S3-compatible bucket you own. Nothing leaves the cell except the integrations you connect (your Git host, registries, issue tracker, chat)." },
       { "q": "Is the source code available?", "a": "No. Matelot is closed source. Customers receive the container images and the Helm chart; both are published on GitHub Packages, signed with cosign (keyless, GitHub OIDC) and carry SBOM attestations, so you can verify what you run with the same tools Matelot uses on your software." },

@@ -1,11 +1,11 @@
-# matelot-io/website
+# matelot-cloud/website
 
-The public website of [Matelot](https://matelot-io.github.io/website/): landing page and documentation, published to
+The public website of [Matelot](https://matelot-cloud.github.io/website/): landing page and documentation, published to
 GitHub Pages by `.github/workflows/pages.yml` on every push to `main`.
 
 | Path | What | Edited by |
 | --- | --- | --- |
-| `content.json` | every string of the landing page: hero, features, integrations, **pricing (indicative)**, FAQ, links | people — this is the one file to change for marketing text |
+| `content.json` | every string of the landing page: hero, features, integrations, **pricing (indicative)**, FAQ, links; `org` names the GitHub organization once and `{{org}}` stands for it in every URL | people — this is the one file to change for marketing text |
 | `tools/landing.mjs` | the page structure on the TemplateMo 621 "Luminary" template | people, rarely |
 | `assets/` | logo, favicon, `matelot.css` (our styles), `vendor/` (template stylesheet, script, images — credit link required, see `assets/vendor/LICENSE.md`) | people |
 | `docs/latest/`, `docs/vX.Y/` | the generated documentation: `latest` follows the platform's `main`, one folder per release line | **the platform's workflows only** — never by hand (the next sync overwrites it) |
@@ -27,8 +27,8 @@ Node 22, no dependencies to install.
 ## Custom domain
 
 One setting: the repository variable **`SITE_DOMAIN`** (Settings → Secrets and variables → Actions → Variables).
-Empty (the default) builds for `https://matelot-io.github.io/website`. Set it to `matelot.io` once the DNS points at
-GitHub Pages (`A`/`AAAA` records for the apex, or a `CNAME` to `matelot-io.github.io`), and the build writes the
+Empty (the default) builds for `https://matelot-cloud.github.io/website`. Set it to `matelot.io` once the DNS points at
+GitHub Pages (`A`/`AAAA` records for the apex, or a `CNAME` to `matelot-cloud.github.io`), and the build writes the
 `CNAME` file, the sitemap and the social-preview URLs for that domain; also enter the domain under Settings → Pages so
 GitHub provisions the certificate. Links inside the site are relative, so nothing else changes.
 
@@ -37,8 +37,8 @@ GitHub provisions the certificate. Links inside the site are relative, so nothin
 The Markdown sources live in the private platform repository (`docs/`). Its workflows render them and push the result
 here: every push to the platform's `main` updates `docs/latest/`; every release `vX.Y.Z` writes `docs/vX.Y/` and
 `latest`. The version switcher on every docs page is built from the folders present under `docs/`.
-Questions and corrections about the documentation: [GitHub Discussions](https://github.com/matelot-io/matelot/discussions)
-or an issue in [matelot-io/matelot](https://github.com/matelot-io/matelot/issues).
+Questions and corrections about the documentation: [GitHub Discussions](https://github.com/matelot-cloud/matelot/discussions)
+or an issue in [matelot-cloud/matelot](https://github.com/matelot-cloud/matelot/issues).
 
 ## Licence
 

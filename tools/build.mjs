@@ -19,7 +19,10 @@ const args = process.argv.slice(2);
 const opt = (name, def) => (args.includes(name) ? args[args.indexOf(name) + 1] : def);
 const OUT = resolve(ROOT, opt('--out', 'dist'));
 const CHECK_ONLY = args.includes('--check');
-const content = JSON.parse(readFileSync(join(ROOT, 'content.json'), 'utf8'));
+// content.json names the GitHub organization once (`org`); every `{{org}}` in it is resolved here
+const rawContent = readFileSync(join(ROOT, 'content.json'), 'utf8');
+const ORG = JSON.parse(rawContent).org;
+const content = JSON.parse(rawContent.replaceAll('{{org}}', ORG));
 const PRODUCT = content.product;
 const SITE_DOMAIN = (process.env.SITE_DOMAIN ?? '').trim();
 const siteUrl = (SITE_DOMAIN ? `https://${SITE_DOMAIN}` : content.site.url).replace(/\/$/, '');

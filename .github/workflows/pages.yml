@@ -1,7 +1,7 @@
 # Builds the landing page + the committed documentation folders and publishes them to GitHub Pages.
 # Runs on every push to main (including the pushes made by the platform's release / docs-sync workflows).
 # One-time setup: Settings → Pages → Source: "GitHub Actions". Custom domain: the repository variable SITE_DOMAIN
-# (Settings → Secrets and variables → Actions → Variables), e.g. `matelot.io`; empty = https://matelot-io.github.io/website.
+# (Settings → Secrets and variables → Actions → Variables), e.g. `matelot.io`; empty = https://matelot-cloud.github.io/website.
 name: pages
 on:
   push:
@@ -27,6 +27,8 @@ jobs:
       - uses: actions/setup-node@v7
         with: { node-version: 22 }
       - run: node tools/test.mjs
+      - name: No retired organization name survives
+        run: '! grep -rnI --fixed-strings "matelot-""io" --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=dist . || { echo "old organization name found"; exit 1; }'
       - run: node tools/build.mjs            # fails on a broken link anywhere in the site
       - uses: actions/upload-pages-artifact@v5
         with: { path: dist }

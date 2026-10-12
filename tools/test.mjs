@@ -8,7 +8,8 @@ import assert from 'node:assert/strict';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
-const content = JSON.parse(readFileSync(join(root, 'content.json'), 'utf8'));
+const rawContent = readFileSync(join(root, 'content.json'), 'utf8');
+const content = JSON.parse(rawContent.replaceAll('{{org}}', JSON.parse(rawContent).org));
 
 // 1. default build: GitHub Pages URL, no CNAME
 const out = mkdtempSync(join(tmpdir(), 'site-'));
@@ -26,7 +27,8 @@ assert.match(landing, /<section class="section section-center" id="pricing">/);
 assert.doesNotMatch(landing, /id="testimonials"/, 'testimonials rendered although disabled');
 assert.doesNotMatch(landing, /pricingToggle|price-option/, 'template price toggle rendered');
 assert.match(landing, /href="docs\/latest\/install\.html"/, 'install guide not linked');
-assert.match(landing, /href="https:\/\/github\.com\/matelot-io\/matelot" target="_blank"/, 'GitHub link not external');
+assert.match(landing, new RegExp(`href="https://github\\.com/${content.org}/matelot" target="_blank"`), 'GitHub link not external');
+assert.doesNotMatch(landing, /\{\{org\}\}/, 'an {{org}} placeholder survived');
 for (const f of ['assets/logo.png', 'assets/favicon.png', 'assets/matelot.css', 'assets/vendor/templatemo-621-luminary-style.css', 'assets/vendor/templatemo-621-luminary-script.js', 'assets/vendor/LICENSE.md', '404.html', '.nojekyll', 'robots.txt', 'sitemap.xml', 'docs/index.html', 'docs/versions.json', 'docs/latest/index.html', 'docs/latest/install.html', 'docs/latest/search-index.json']) assert.ok(existsSync(join(out, f)), `missing ${f}`);
 assert.ok(!existsSync(join(out, 'CNAME')), 'CNAME written without SITE_DOMAIN');
 assert.match(readFileSync(join(out, 'robots.txt'), 'utf8'), new RegExp(`Sitemap: ${content.site.url.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}/sitemap.xml`));
@@ -37,7 +39,7 @@ const pages = readdirSync(join(out, 'docs/latest')).filter((f) => f.endsWith('.h
 assert.ok(pages.length >= 20, `only ${pages.length} docs pages`);
 const install = readFileSync(join(out, 'docs/latest/install.html'), 'utf8');
 assert.match(install, /<meta name="docs-version" content="latest">/);
-assert.match(install, /class="top-links"><a href="\.\.\/\.\.\/">Home<\/a><a href="index\.html">Docs<\/a><a class="current" href="install\.html">Install<\/a><a href="https:\/\/github\.com\/matelot-io\/matelot"/);
+assert.match(install, new RegExp(`class="top-links"><a href="\\.\\./\\.\\./">Home</a><a href="index\\.html">Docs</a><a class="current" href="install\\.html">Install</a><a href="https://github\\.com/${content.org}/matelot"`));
 const versions = JSON.parse(readFileSync(join(out, 'docs/versions.json'), 'utf8')).versions.map((v) => v.name);
 assert.equal(versions[0], 'latest');
 for (const v of versions) assert.ok(existsSync(join(out, 'docs', v, 'index.html')), `version ${v} has no index`);
