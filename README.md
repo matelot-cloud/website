@@ -1,6 +1,6 @@
 # matelot-cloud/website
 
-The public website of [Matelot](https://matelot-cloud.github.io/website/): landing page and documentation, published to
+The public website of [Matelot](https://matelot.cloud/): landing page and documentation, published to
 GitHub Pages by `.github/workflows/pages.yml` on every push to `main`.
 
 | Path | What | Edited by |
@@ -38,7 +38,7 @@ and let the build write `CNAME`; a UI edit is what resets the source.
 ## Custom domain
 
 One setting: the repository variable **`SITE_DOMAIN`** (Settings → Secrets and variables → Actions → Variables).
-Empty (the default) builds for `https://matelot-cloud.github.io/website`. Set it to `matelot.cloud` once the DNS points at
+Empty builds for the `url` in content.json (https://matelot.cloud; the GitHub Pages address https://matelot-cloud.github.io/website keeps serving as a fallback). Set it to `matelot.cloud` once the DNS points at
 GitHub Pages (`A`/`AAAA` records for the apex, or a `CNAME` to `matelot-cloud.github.io`), and the build writes the
 `CNAME` file, the sitemap and the social-preview URLs for that domain; also enter the domain under Settings → Pages so
 GitHub provisions the certificate. Links inside the site are relative, so nothing else changes.

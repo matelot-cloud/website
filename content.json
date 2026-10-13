@@ -4,7 +4,7 @@
   "tagline": "Product security for the software you ship — self-hosted",
   "brandTag": "Self-hosted product security",
   "site": {
-    "url": "https://{{org}}.github.io/website",
+    "url": "https://matelot.cloud",
     "title": "Matelot — product security, DevSecOps and CRA compliance, self-hosted in your cluster",
     "description": "SBOMs, vulnerability correlation, policies and gates, keyless registries, managed runners and CRA evidence. One Helm chart, one cell per organization, in your own Kubernetes cluster.",
     "github": "https://github.com/{{org}}/matelot",

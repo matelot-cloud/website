@@ -3,7 +3,7 @@
 # Pages source must be "GitHub Actions": the deploy job sets it (build_type=workflow) before every deploy, because GitHub
 # resets it to the legacy branch build on its own (seen twice after the custom domain was written) and the site then
 # shows the README. Custom domain: the repository variable SITE_DOMAIN (Settings → Secrets and variables → Actions →
-# Variables), e.g. `matelot.cloud`; empty = https://matelot-cloud.github.io/website. The platform's docs-sync and release
+# Variables), e.g. `matelot.cloud`; empty = the url in content.json (the Pages address https://matelot-cloud.github.io/website keeps working). The platform's docs-sync and release
 # workflows also fire the repository_dispatch below after pushing docs, so the source is healed even without a commit.
 name: pages
 on:

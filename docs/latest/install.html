@@ -88,7 +88,7 @@ backup archive, so you can start with Compose and move later without losing anyt
 it; Caddy obtains Let&#39;s Encrypt certificates on first start. Without a domain everything runs on <code>http://localhost</code>.</li>
 </ul>
 <h3 id="a2-start-it"><a class="anchor" href="#a2-start-it">A2. Start it</a></h3>
-<pre><code class="language-bash">git clone https://github.com/matelot-cloud/matelot.git &amp;&amp; cd matelot/docker   # or download the docker/ folder
+<pre><code class="language-bash">git clone --depth 1 https://github.com/matelot-cloud/matelot &amp;&amp; cd matelot/docker   # or download the docker/ folder
 cp .env.example .env
 # edit .env: MATELOT_DOMAIN (keep localhost to try it), MATELOT_ADMIN_EMAIL, optionally MATELOT_ADMIN_PASSWORD
 docker compose up -d
@@ -126,7 +126,7 @@ docker push &quot;$(matelot registry path --service &lt;serviceId&gt;)&quot;:1  
 <tbody><tr>
 <td><code>MATELOT_VERSION</code></td>
 <td>the release the file shipped with</td>
-<td>image tag of the four Matelot images; change it to upgrade</td>
+<td>image tag of the four Matelot images — the bare version (<code>0.1.0</code>, <code>0.1.0-rc.8</code>), not the <code>v…</code> git tag (images carry both); change it to upgrade</td>
 </tr>
 <tr>
 <td><code>MATELOT_DOMAIN</code></td>
