@@ -23,11 +23,177 @@
   <main class="content">
     <div class="crumbs">Start here</div>
     <article><h1 id="install-matelot"><a class="anchor" href="#install-matelot">Install Matelot</a></h1>
-<p>Matelot runs as <strong>one cell per organization</strong> in your own Kubernetes cluster: the API, the worker, the web app, managed
-runners, a container registry, Postgres, Redis and Keycloak, installed from one Helm chart. Nothing is shared with
-anyone else and nothing leaves the cluster except the integrations you connect. This guide takes you from an empty
-namespace to the first administrator logged in, with backups on.</p>
-<h2 id="1-requirements"><a class="anchor" href="#1-requirements">1. Requirements</a></h2>
+<p>Matelot runs as <strong>one cell per organization</strong> on infrastructure you control: the API, the worker, the web app, a
+managed runner, a container registry, Postgres, Redis and Keycloak. Nothing is shared with anyone else and nothing
+leaves the cell except the integrations you connect. Two ways to install it:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><strong>Option A — Docker Compose</strong> (recommended to start)</th>
+<th><strong>Option B — Kubernetes (Helm)</strong></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>For</td>
+<td>evaluation, small teams, one host</td>
+<td>production, several teams, your platform standards</td>
+</tr>
+<tr>
+<td>Needs</td>
+<td>Docker 24+ with Compose v2, 2 vCPU / 4 GB, a port (80/443), optionally a DNS name</td>
+<td>a cluster, ingress, TLS, storage class, a wildcard DNS record</td>
+</tr>
+<tr>
+<td>Time to first login</td>
+<td>about five minutes</td>
+<td>an afternoon the first time</td>
+</tr>
+<tr>
+<td>Availability</td>
+<td>single host; restart = short downtime</td>
+<td>replicas for the API and web, Postgres on a volume or a managed database</td>
+</tr>
+<tr>
+<td>TLS</td>
+<td>automatic (Let&#39;s Encrypt via Caddy) with a real domain; plain HTTP on localhost</td>
+<td>cert-manager or your own certificates</td>
+</tr>
+<tr>
+<td>Backups</td>
+<td><code>cell-backup.sh --compose</code> (databases + secrets + registry blobs), cron on the host</td>
+<td>CronJob in the chart to a volume and/or S3</td>
+</tr>
+<tr>
+<td>Upgrades</td>
+<td>change <code>MATELOT_VERSION</code>, <code>docker compose pull &amp;&amp; up -d</code></td>
+<td><code>helm upgrade --version</code></td>
+</tr>
+<tr>
+<td>When to move</td>
+<td>when you need HA, more than one runner pool on the same host, or company Kubernetes policies — a Compose backup restores into a Helm cell (same archive format)</td>
+<td></td>
+</tr>
+</tbody></table>
+<p>Both use the same images (<code>ghcr.io/matelot-cloud/{api,worker,web,runner}</code>), the same release, and the same
+backup archive, so you can start with Compose and move later without losing anything.</p>
+<hr>
+<h2 id="option-a-docker-compose"><a class="anchor" href="#option-a-docker-compose">Option A: Docker Compose</a></h2>
+<h3 id="a1-requirements"><a class="anchor" href="#a1-requirements">A1. Requirements</a></h3>
+<ul>
+<li>Docker Engine 24 or newer with the Compose plugin v2 (<code>docker compose version</code>), on Linux, macOS or WSL 2.</li>
+<li>2 vCPU and 4 GB of memory (the stack is limited to about 4 GB; Keycloak is the largest part), 20 GB of disk.</li>
+<li>Ports 80 and 443 free (configurable), plus 5000 when you use the registry on localhost.</li>
+<li>For HTTPS: a DNS name for the host (<code>matelot.example.com</code>) <strong>and</strong> <code>registry.matelot.example.com</code>, both pointing at
+it; Caddy obtains Let&#39;s Encrypt certificates on first start. Without a domain everything runs on <code>http://localhost</code>.</li>
+</ul>
+<h3 id="a2-start-it"><a class="anchor" href="#a2-start-it">A2. Start it</a></h3>
+<pre><code class="language-bash">git clone https://github.com/matelot-cloud/matelot.git &amp;&amp; cd matelot/docker   # or download the docker/ folder
+cp .env.example .env
+# edit .env: MATELOT_DOMAIN (keep localhost to try it), MATELOT_ADMIN_EMAIL, optionally MATELOT_ADMIN_PASSWORD
+docker compose up -d
+docker compose logs -f welcome          # prints the URL and the administrator login once the cell answers
+</code></pre>
+<p>The first start pulls the images, generates every secret (database and Keycloak passwords, the cell encryption key,
+the registry signing key, the managed-runner secret) into the <code>config</code> volume, runs the database migrations,
+imports the Keycloak realm with the first administrator, and starts the managed runner. Nothing in the files is a
+default password. Two to five minutes later <code>welcome</code> prints:</p>
+<pre><code> Matelot is up:    http://localhost
+ Sign in as:       admin@localhost
+ Password:         &lt;generated&gt;
+ Registry:         localhost:5000
+</code></pre>
+<p>Sign in with that e-mail and password (<code>docker compose logs welcome</code> shows them again; <code>docker compose run --rm init show</code> prints them from the volume). The first login of <code>MATELOT_ADMIN_EMAIL</code> becomes administrator of the
+root organization; invite the team from <strong>Members</strong>, or connect your identity provider in Keycloak
+(<code>&lt;url&gt;/auth/admin/</code>, user <code>admin</code>, password in the <code>config</code> volume under <code>secrets/keycloak/</code>).</p>
+<p>Check it from your machine:</p>
+<pre><code class="language-bash">npm install -g https://github.com/matelot-cloud/setup-cli/releases/latest/download/matelot-cli.tgz
+matelot login --url http://localhost
+matelot doctor                   # API, version, login, organization, runners online, registry
+matelot registry login           # docker login to the cell&#39;s registry with your credentials
+matelot registry info            # host and the repository pattern: &lt;workspace&gt;/&lt;team&gt;/&lt;project&gt;/&lt;service&gt;:&lt;tag&gt;
+docker push &quot;$(matelot registry path --service &lt;serviceId&gt;)&quot;:1   # prints host + path; any other repository name is refused
+</code></pre>
+<h3 id="a3-settings-env"><a class="anchor" href="#a3-settings-env">A3. Settings (.env)</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>What</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>MATELOT_VERSION</code></td>
+<td>the release the file shipped with</td>
+<td>image tag of the four Matelot images; change it to upgrade</td>
+</tr>
+<tr>
+<td><code>MATELOT_DOMAIN</code></td>
+<td><code>localhost</code></td>
+<td>hostname users open; a real name switches to HTTPS and <code>registry.&lt;domain&gt;</code></td>
+</tr>
+<tr>
+<td><code>MATELOT_ACME_EMAIL</code></td>
+<td>empty</td>
+<td>Let&#39;s Encrypt contact</td>
+</tr>
+<tr>
+<td><code>MATELOT_ADMIN_EMAIL</code> / <code>MATELOT_ADMIN_PASSWORD</code></td>
+<td><code>admin@localhost</code> / generated</td>
+<td>the first administrator (password set here only before the first start)</td>
+</tr>
+<tr>
+<td><code>MATELOT_ORG_SLUG</code> / <code>MATELOT_ORG_NAME</code></td>
+<td><code>main</code> / <code>My organization</code></td>
+<td>the root organization (slug is permanent)</td>
+</tr>
+<tr>
+<td><code>MATELOT_HTTP_PORT</code> / <code>MATELOT_HTTPS_PORT</code> / <code>MATELOT_REGISTRY_PORT</code></td>
+<td>80 / 443 / 5000</td>
+<td>published ports</td>
+</tr>
+<tr>
+<td><code>MATELOT_LICENSE</code></td>
+<td>empty</td>
+<td>licence key (Free tier when empty; entitlements arrive with the commercial release)</td>
+</tr>
+<tr>
+<td><code>MATELOT_BACKUP_RETENTION_DAYS</code></td>
+<td>14</td>
+<td>archives kept on the backups volume</td>
+</tr>
+</tbody></table>
+<p>Changing <code>MATELOT_DOMAIN</code> after the first start: Keycloak imported the realm with the old redirect URIs, so run
+<code>docker compose run --rm init realm-update</code> after <code>docker compose up -d</code> (or edit the <code>platform-web</code> client in the
+Keycloak admin console). Everything else regenerates on every start.</p>
+<h3 id="a4-backups-and-restore"><a class="anchor" href="#a4-backups-and-restore">A4. Backups and restore</a></h3>
+<pre><code class="language-bash">scripts/cell-backup.sh --compose . -d ./backups        # pg_dump of both databases + secrets + registry blobs → one archive
+scripts/cell-backup.sh --compose . --list              # archives on the backups volume
+scripts/cell-restore.sh --compose . ./backups/main-20261012T140000Z.tar.gz   # replaces the cell&#39;s data with the archive
+</code></pre>
+<p>Schedule it with cron on the host (<code>17 2 * * * cd /opt/matelot/docker &amp;&amp; scripts/cell-backup.sh --compose . -d /backups</code>).
+The archive is the same format as the Kubernetes backup, so it restores into a Helm cell too (registry blobs are
+restored only into Compose cells). The archive contains the encryption key and every password: keep it where only the
+cell&#39;s operators can read it. Rebuilding on a new host: copy the <code>docker/</code> folder and <code>.env</code>, then
+<code>cell-restore.sh --compose . ARCHIVE</code> — it recreates the volumes, restores the secrets first, then the databases.</p>
+<h3 id="a5-upgrades-and-rollback"><a class="anchor" href="#a5-upgrades-and-rollback">A5. Upgrades and rollback</a></h3>
+<pre><code class="language-bash"># edit .env: MATELOT_VERSION=0.2.0
+scripts/cell-backup.sh --compose . -d ./backups
+docker compose pull &amp;&amp; docker compose up -d           # migrations run before the new API starts
+matelot doctor
+</code></pre>
+<p>Only the four Matelot services restart; Postgres, Keycloak, Redis and the registry keep running. Rollback: set the
+previous <code>MATELOT_VERSION</code> and <code>docker compose up -d</code> — this works as long as the newer release added no database
+migration (the release notes say so); otherwise restore the backup taken before the upgrade, then roll the version
+back. Release notes and image digests: <a href="https://github.com/matelot-cloud/matelot/releases" target="_blank" rel="noopener">https://github.com/matelot-cloud/matelot/releases</a>.</p>
+<h3 id="a6-removing-it"><a class="anchor" href="#a6-removing-it">A6. Removing it</a></h3>
+<pre><code class="language-bash">docker compose down          # stops the cell, keeps every volume (data, secrets, certificates)
+docker compose down -v       # removes everything
+</code></pre>
+<hr>
+<h2 id="option-b-kubernetes-helm"><a class="anchor" href="#option-b-kubernetes-helm">Option B: Kubernetes (Helm)</a></h2>
+<h3 id="b1-requirements"><a class="anchor" href="#b1-requirements">B1. Requirements</a></h3>
 <table>
 <thead>
 <tr>
@@ -66,7 +232,7 @@ namespace to the first administrator logged in, with backups on.</p>
 </tbody></table>
 <p>Optional: an S3-compatible bucket for off-site backups, an SMTP relay for e-mail notifications, a GitHub App for
 GitHub repositories (any Git host also works with tokens).</p>
-<h2 id="2-choose-the-cell-s-values"><a class="anchor" href="#2-choose-the-cell-s-values">2. Choose the cell&#39;s values</a></h2>
+<h3 id="b2-choose-the-cell-s-values"><a class="anchor" href="#b2-choose-the-cell-s-values">B2. Choose the cell&#39;s values</a></h3>
 <pre><code class="language-bash">helm show values oci://ghcr.io/matelot-cloud/charts/secops-cell --version 0.1.0 &gt; values.yaml
 </code></pre>
 <p>The settings that matter for a first install:</p>
@@ -100,7 +266,7 @@ backup:
 <p>Images are <code>ghcr.io/matelot-cloud/{api,worker,web,runner}</code> at the chart&#39;s <code>appVersion</code>; leave the <code>image</code> blocks alone
 unless you mirror them. Everything else (replicas, resources, managed runner count, SMTP via <code>api.extraEnv</code>) has a
 documented default in <code>values.yaml</code>.</p>
-<h2 id="3-install"><a class="anchor" href="#3-install">3. Install</a></h2>
+<h3 id="b3-install"><a class="anchor" href="#b3-install">B3. Install</a></h3>
 <pre><code class="language-bash">helm install acme oci://ghcr.io/matelot-cloud/charts/secops-cell --version 0.1.0 \
   --namespace tenant-acme --create-namespace -f values.yaml
 kubectl -n tenant-acme get pods -w
@@ -114,7 +280,7 @@ kubectl -n tenant-acme logs job/acme-backup-first -f
 </code></pre>
 <p>The chart generates and keeps its own secrets (the encryption key for stored credentials, the registry token key
 pair, the managed-runner secret); they survive upgrades and are part of every backup.</p>
-<h2 id="4-first-login-and-identity"><a class="anchor" href="#4-first-login-and-identity">4. First login and identity</a></h2>
+<h3 id="b4-first-login-and-identity"><a class="anchor" href="#b4-first-login-and-identity">B4. First login and identity</a></h3>
 <ol>
 <li>Open <code>https://auth-acme.platform.example.com</code> as the Keycloak admin (<code>keycloak.adminPassword</code>), realm <code>platform</code>,
 and add your identity provider (SAML or OIDC: Entra ID, Okta, Google Workspace…). Users are created on first
@@ -126,20 +292,20 @@ there, create a project and a service, attach a repository and run the security 
 </ol>
 <p>For a quick evaluation without an identity provider, <code>keycloak.seedUsers</code> creates local users (and
 <code>keycloak.allowPasswordGrant: true</code> lets the CLI log in with a password); remove both for production.</p>
-<h2 id="5-the-cli"><a class="anchor" href="#5-the-cli">5. The CLI</a></h2>
-<pre><code class="language-bash">npm install -g &quot;github:matelot-cloud/setup-cli#v2&quot;   # or: uses: matelot-cloud/setup-cli@v2 in GitHub Actions
+<h3 id="b5-the-cli"><a class="anchor" href="#b5-the-cli">B5. The CLI</a></h3>
+<pre><code class="language-bash">npm install -g https://github.com/matelot-cloud/setup-cli/releases/latest/download/matelot-cli.tgz   # pinned: .../releases/download/vX.Y.Z/matelot-cli-X.Y.Z.tgz · GitHub Actions: uses: matelot-cloud/setup-cli@v2
 matelot login --url https://acme.platform.example.com
 matelot whoami
 </code></pre>
 <p>CI pipelines authenticate with signed CI tokens (created in the web app under Access tokens), never with a user
 password: see the CI/CD integration page.</p>
-<h2 id="6-backups"><a class="anchor" href="#6-backups">6. Backups</a></h2>
+<h3 id="b6-backups"><a class="anchor" href="#b6-backups">B6. Backups</a></h3>
 <p>With <code>backup.enabled</code> the cell backs itself up on the schedule: <code>pg_dump</code> of the platform and Keycloak databases plus
 the cell&#39;s secrets, as one archive on the backups volume and, if configured, in your S3 bucket. The archive
 contains the encryption key and passwords: restrict the bucket and the volume to the cell&#39;s operators.</p>
 <p>Restore, including rebuilding a cell on a new cluster, is described on the Backup and restore page. The order
 matters there: the secrets must be restored <strong>before</strong> <code>helm install</code>, so the restored data can be decrypted.</p>
-<h2 id="7-upgrades"><a class="anchor" href="#7-upgrades">7. Upgrades</a></h2>
+<h3 id="b7-upgrades"><a class="anchor" href="#b7-upgrades">B7. Upgrades</a></h3>
 <p>Each release ships the four images and the chart at the same version. To upgrade:</p>
 <pre><code class="language-bash">helm upgrade acme oci://ghcr.io/matelot-cloud/charts/secops-cell --version 0.2.0 \
   --namespace tenant-acme -f values.yaml
@@ -149,14 +315,14 @@ new API starts. An image release rolls only the api, worker, web and runner pods
 registry keep running. Release notes and image digests are published with every release at
 <a href="https://github.com/matelot-cloud/matelot/releases" target="_blank" rel="noopener">https://github.com/matelot-cloud/matelot/releases</a>; images and the chart are signed with cosign (keyless, GitHub OIDC)
 and carry SBOM attestations.</p>
-<h2 id="8-removing-a-cell"><a class="anchor" href="#8-removing-a-cell">8. Removing a cell</a></h2>
+<h3 id="b8-removing-a-cell"><a class="anchor" href="#b8-removing-a-cell">B8. Removing a cell</a></h3>
 <pre><code class="language-bash">helm uninstall acme --namespace tenant-acme     # keeps the volumes (databases, registry, backups) and the secrets
 kubectl delete namespace tenant-acme            # removes everything
 </code></pre>
 </article>
     <footer>Matelot documentation · v0.1 · <a href="../../">home</a> · <a href="https://github.com/matelot-cloud/matelot/discussions" target="_blank" rel="noopener">questions</a> · <a href="https://github.com/matelot-cloud/matelot/releases" target="_blank" rel="noopener">releases</a></footer>
   </main>
-  <nav class="toc"><div class="toc-title">On this page</div><ul><li class="d2"><a href="#1-requirements">1. Requirements</a></li><li class="d2"><a href="#2-choose-the-cell-s-values">2. Choose the cell's values</a></li><li class="d2"><a href="#3-install">3. Install</a></li><li class="d2"><a href="#4-first-login-and-identity">4. First login and identity</a></li><li class="d2"><a href="#5-the-cli">5. The CLI</a></li><li class="d2"><a href="#6-backups">6. Backups</a></li><li class="d2"><a href="#7-upgrades">7. Upgrades</a></li><li class="d2"><a href="#8-removing-a-cell">8. Removing a cell</a></li></ul></nav>
+  <nav class="toc"><div class="toc-title">On this page</div><ul><li class="d2"><a href="#option-a-docker-compose">Option A: Docker Compose</a></li><li class="d3"><a href="#a1-requirements">A1. Requirements</a></li><li class="d3"><a href="#a2-start-it">A2. Start it</a></li><li class="d3"><a href="#a3-settings-env">A3. Settings (.env)</a></li><li class="d3"><a href="#a4-backups-and-restore">A4. Backups and restore</a></li><li class="d3"><a href="#a5-upgrades-and-rollback">A5. Upgrades and rollback</a></li><li class="d3"><a href="#a6-removing-it">A6. Removing it</a></li><li class="d2"><a href="#option-b-kubernetes-helm">Option B: Kubernetes (Helm)</a></li><li class="d3"><a href="#b1-requirements">B1. Requirements</a></li><li class="d3"><a href="#b2-choose-the-cell-s-values">B2. Choose the cell's values</a></li><li class="d3"><a href="#b3-install">B3. Install</a></li><li class="d3"><a href="#b4-first-login-and-identity">B4. First login and identity</a></li><li class="d3"><a href="#b5-the-cli">B5. The CLI</a></li><li class="d3"><a href="#b6-backups">B6. Backups</a></li><li class="d3"><a href="#b7-upgrades">B7. Upgrades</a></li><li class="d3"><a href="#b8-removing-a-cell">B8. Removing a cell</a></li></ul></nav>
 </div>
 <script src="site.js" defer></script>
 </body>

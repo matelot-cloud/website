@@ -58,7 +58,7 @@
 </tr>
 <tr>
 <td>PRODUCT_SECURITY_ENGINEER</td>
-<td>decisions, remediations and issues, request exceptions, pipelines, SBOMs</td>
+<td>decisions, remediations and issues, request exceptions, pipelines, SBOMs, sees runner pools and runners</td>
 </tr>
 <tr>
 <td>DEVELOPER</td>
@@ -73,33 +73,150 @@
 <code>exception:approve</code> (make one active) are separate from <code>policy:write</code>. An exception created by someone who can
 approve is active at once; otherwise it waits for an approver (Project → Security → Exceptions → Approve).</p>
 <h2 id="token-scopes-personal-tokens-matelot-login-claude-ai-connectors"><a class="anchor" href="#token-scopes-personal-tokens-matelot-login-claude-ai-connectors">Token scopes (personal tokens, <code>matelot login</code>, claude.ai connectors)</a></h2>
-<p>A token acts as the user, but the scope caps what the user&#39;s roles allow. Administrative roles are <strong>downgraded</strong>:</p>
+<p>A token acts as the user with the user&#39;s <strong>own roles</strong> — the scope is a mask over what those roles allow, never a
+different role (a fixed role for <code>write</code> was tried first and kept breaking first-run flows: an administrator&#39;s default
+<code>matelot login</code> could not create a workspace).</p>
 <table>
 <thead>
 <tr>
 <th>Scope</th>
-<th>Effective role for ORG_ADMIN / SECURITY_ADMIN memberships</th>
-<th>Cell admins without memberships</th>
+<th>May</th>
+<th>May not</th>
 </tr>
 </thead>
 <tbody><tr>
 <td><code>read</code></td>
-<td>AUDITOR</td>
-<td>AUDITOR on every organization</td>
+<td>every <code>*:read</code> permission the roles grant, <code>registry:pull</code>, <code>gate:evaluate</code>; HTTP <code>GET</code>/<code>HEAD</code> only</td>
+<td>change anything</td>
 </tr>
 <tr>
-<td><code>write</code></td>
-<td>PRODUCT_SECURITY_ENGINEER</td>
-<td>PRODUCT_SECURITY_ENGINEER on every organization</td>
+<td><code>write</code> (default of <code>matelot login</code>)</td>
+<td>everything the roles grant <strong>except</strong> the administrative permissions below; any method except <code>DELETE</code></td>
+<td>administer, delete or archive</td>
 </tr>
 <tr>
-<td><code>sudo</code></td>
-<td>unchanged (ORG_ADMIN); platform-admin elevation applies</td>
-<td>everything</td>
+<td><code>sudo</code> (administrators only)</td>
+<td>the full role, platform-admin elevation included; every method</td>
+<td>—</td>
 </tr>
 </tbody></table>
-<p>Other roles are unchanged by <code>write</code> (a DEVELOPER&#39;s write token is a DEVELOPER); <code>read</code> tokens are read-only on every route.</p>
-<h3 id="scope-action-asserted-by-apps-api-src-rbac-token-scope-matrix-spec-ts"><a class="anchor" href="#scope-action-asserted-by-apps-api-src-rbac-token-scope-matrix-spec-ts">Scope × action (asserted by <code>apps/api/src/rbac/token-scope-matrix.spec.ts</code>)</a></h3>
+<h3 id="permission-scope"><a class="anchor" href="#permission-scope">Permission × scope</a></h3>
+<table>
+<thead>
+<tr>
+<th>Permission</th>
+<th>read</th>
+<th>write</th>
+<th>sudo</th>
+<th>Used for</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>*:read</code> (<code>organization</code>, <code>workspace</code>, <code>project</code>, <code>vulnerability</code>, <code>policy</code>, <code>evidence</code>, <code>runner</code>, <code>job</code>, …)</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>reading</td>
+</tr>
+<tr>
+<td><code>registry:pull</code>, <code>gate:evaluate</code></td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>pulling images, evaluating a gate</td>
+</tr>
+<tr>
+<td><code>workspace:write</code>, <code>team:write</code>, <code>project:write</code>, <code>service:write</code>, <code>environment:write</code></td>
+<td>❌</td>
+<td>✅</td>
+<td>✅</td>
+<td>creating and editing the structure</td>
+</tr>
+<tr>
+<td><code>job:create</code>, <code>job:cancel</code>, <code>registry:push</code>, <code>sbom:write</code>, <code>release:write</code>, <code>deployment:write</code></td>
+<td>❌</td>
+<td>✅</td>
+<td>✅</td>
+<td>running pipelines, pushing, recording releases</td>
+</tr>
+<tr>
+<td><code>vulnerability:write</code>, <code>exception:write</code>, <code>policy:exception_request</code>, <code>evidence:write</code>, <code>risk:write</code>, <code>incident:write</code></td>
+<td>❌</td>
+<td>✅</td>
+<td>✅</td>
+<td>deciding on findings, remediations, requesting exceptions</td>
+</tr>
+<tr>
+<td><code>organization:write</code>, <code>organization:create_child</code></td>
+<td>❌</td>
+<td>❌</td>
+<td>✅</td>
+<td>organization settings, renames, subsidiaries</td>
+</tr>
+<tr>
+<td><code>membership:write</code></td>
+<td>❌</td>
+<td>❌</td>
+<td>✅</td>
+<td>members and roles</td>
+</tr>
+<tr>
+<td><code>integration:write</code>, <code>integration:connect</code></td>
+<td>❌</td>
+<td>❌</td>
+<td>✅</td>
+<td>connections hold credentials</td>
+</tr>
+<tr>
+<td><code>policy:write</code></td>
+<td>❌</td>
+<td>❌</td>
+<td>✅</td>
+<td>policies, notification channels, SLA settings</td>
+</tr>
+<tr>
+<td><code>exception:approve</code>, <code>policy:exception_approve</code>, <code>risk:accept</code></td>
+<td>❌</td>
+<td>❌</td>
+<td>✅</td>
+<td>accepting risk</td>
+</tr>
+<tr>
+<td><code>compliance:write</code></td>
+<td>❌</td>
+<td>❌</td>
+<td>✅</td>
+<td>frameworks and controls</td>
+</tr>
+<tr>
+<td><code>runner:write</code></td>
+<td>❌</td>
+<td>❌</td>
+<td>✅</td>
+<td>runner pools and registration tokens</td>
+</tr>
+<tr>
+<td>any <code>DELETE</code> route (archive a workspace / project / team, delete a policy, integration, membership, token, runner pool)</td>
+<td>❌</td>
+<td>❌</td>
+<td>✅</td>
+<td>destructive operations</td>
+</tr>
+<tr>
+<td>tokens (create / revoke personal and CI tokens), licence</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+<td>web session only</td>
+</tr>
+</tbody></table>
+<p>The rows marked sudo-only are the <code>SUDO_ONLY</code> set in <code>apps/api/src/rbac/permissions.ts</code>; the <code>DELETE</code> rule is
+<code>methodRefusedForScope</code> in <code>apps/api/src/auth/personal-tokens/personal-token.guard.ts</code>. Both are asserted by
+<code>apps/api/src/rbac/token-scope-matrix.spec.ts</code>, which also walks the customer&#39;s first-run path with a write-scoped
+administrator token — create workspace → team → project → run a pipeline → read findings → push to the registry — and
+checks that only the administrative row needs sudo. A DEVELOPER&#39;s <code>write</code> token is still a DEVELOPER: the mask only
+removes, it never adds.</p>
+<h3 id="scope-action-the-consent-page"><a class="anchor" href="#scope-action-the-consent-page">Scope × action (the consent page)</a></h3>
 <table>
 <thead>
 <tr>
@@ -110,61 +227,49 @@ approve is active at once; otherwise it waits for an approver (Project → Secur
 </tr>
 </thead>
 <tbody><tr>
-<td>read findings / gates / evidence</td>
+<td>read findings / gates / evidence, pull from the registry, see runners</td>
 <td>✅</td>
 <td>✅</td>
 <td>✅</td>
 </tr>
 <tr>
-<td>decide on a finding</td>
+<td>create a workspace / team / project / service / environment</td>
 <td>❌</td>
 <td>✅</td>
 <td>✅</td>
 </tr>
 <tr>
-<td>create / update a remediation, open an issue</td>
+<td>run a pipeline, push to the registry, upload an SBOM, record a release / deployment</td>
 <td>❌</td>
 <td>✅</td>
 <td>✅</td>
 </tr>
 <tr>
-<td>request an exception</td>
+<td>decide on a finding, create / update a remediation, open an issue, request an exception</td>
 <td>❌</td>
 <td>✅</td>
 <td>✅</td>
 </tr>
 <tr>
-<td>approve an exception</td>
+<td>approve an exception, accept a risk</td>
 <td>❌</td>
 <td>❌</td>
 <td>✅</td>
 </tr>
 <tr>
-<td>create a policy</td>
+<td>create a policy / notification channel, change SLA settings</td>
 <td>❌</td>
 <td>❌</td>
 <td>✅</td>
 </tr>
 <tr>
-<td>create a notification channel</td>
+<td>grant a membership, connect an integration, organization settings, manage runner pools</td>
 <td>❌</td>
 <td>❌</td>
 <td>✅</td>
 </tr>
 <tr>
-<td>change SLA settings</td>
-<td>❌</td>
-<td>❌</td>
-<td>✅</td>
-</tr>
-<tr>
-<td>run a pipeline</td>
-<td>❌</td>
-<td>✅</td>
-<td>✅</td>
-</tr>
-<tr>
-<td>grant a membership</td>
+<td>archive or delete anything</td>
 <td>❌</td>
 <td>❌</td>
 <td>✅</td>
@@ -174,7 +279,7 @@ approve is active at once; otherwise it waits for an approver (Project → Secur
 </article>
     <footer>Matelot documentation · v0.1 · <a href="../../">home</a> · <a href="https://github.com/matelot-cloud/matelot/discussions" target="_blank" rel="noopener">questions</a> · <a href="https://github.com/matelot-cloud/matelot/releases" target="_blank" rel="noopener">releases</a></footer>
   </main>
-  <nav class="toc"><div class="toc-title">On this page</div><ul><li class="d2"><a href="#roles-memberships">Roles (memberships)</a></li><li class="d2"><a href="#token-scopes-personal-tokens-matelot-login-claude-ai-connectors">Token scopes (personal tokens, matelot login, claude.ai connectors)</a></li><li class="d3"><a href="#scope-action-asserted-by-apps-api-src-rbac-token-scope-matrix-spec-ts">Scope × action (asserted by apps/api/src/rbac/token-scope-matrix.spec.ts)</a></li></ul></nav>
+  <nav class="toc"><div class="toc-title">On this page</div><ul><li class="d2"><a href="#roles-memberships">Roles (memberships)</a></li><li class="d2"><a href="#token-scopes-personal-tokens-matelot-login-claude-ai-connectors">Token scopes (personal tokens, matelot login, claude.ai connectors)</a></li><li class="d3"><a href="#permission-scope">Permission × scope</a></li><li class="d3"><a href="#scope-action-the-consent-page">Scope × action (the consent page)</a></li></ul></nav>
 </div>
 <script src="site.js" defer></script>
 </body>
