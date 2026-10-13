@@ -75,7 +75,7 @@ Path flags: <code>--org</code>, <code>--project</code>, <code>--service</code>, 
 </tr>
 <tr>
 <td><code>matelot registry path --service ID [--env ID] [--connection NAME --repository NAME [--create]]</code></td>
-<td>image path in the built-in or an external registry</td>
+<td>the full pushable image reference (host included) in the built-in or an external registry: <code>docker push &quot;$(matelot registry path --service ID)&quot;:&lt;tag&gt;</code></td>
 </tr>
 <tr>
 <td><code>matelot registry connections --service ID</code></td>
