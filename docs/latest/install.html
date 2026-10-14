@@ -211,7 +211,7 @@ docker compose down -v       # removes everything
 </tr>
 <tr>
 <td>cert-manager with a <code>ClusterIssuer</code>, <strong>or</strong> your own TLS Secrets</td>
-<td>hostnames <code>&lt;slug&gt;.&lt;domain&gt;</code>, <code>auth-&lt;slug&gt;.&lt;domain&gt;</code>, <code>registry-&lt;slug&gt;.&lt;domain&gt;</code></td>
+<td>hostnames <code>&lt;slug&gt;.&lt;domain&gt;</code>, <code>auth-&lt;slug&gt;.&lt;domain&gt;</code>, <code>registry-&lt;slug&gt;.&lt;domain&gt;</code>. <strong>TLS is mandatory for any hostname other than <code>localhost</code>:</strong> browsers treat only <code>https://</code> and <code>localhost</code> as secure contexts, and the Keycloak login page needs one (<code>Crypto.subtle is available only in secure contexts</code>). With <code>ingress.tls: false</code> on a real hostname the API and the CLI work but nobody can sign in with a browser; the chart says so in its install notes. For a local cluster, a self-signed cert-manager issuer is enough (click through the certificate warning, or trust the local CA once)</td>
 </tr>
 <tr>
 <td>A DNS record for those hostnames (a wildcard <code>*.&lt;domain&gt;</code> is simplest)</td>
