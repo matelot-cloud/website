@@ -164,9 +164,9 @@ docker push &quot;$(matelot registry path --service &lt;serviceId&gt;)&quot;:1  
 <td>archives kept on the backups volume</td>
 </tr>
 </tbody></table>
-<p>Changing <code>MATELOT_DOMAIN</code> after the first start: Keycloak imported the realm with the old redirect URIs, so run
-<code>docker compose run --rm init realm-update</code> after <code>docker compose up -d</code> (or edit the <code>platform-web</code> client in the
-Keycloak admin console). Everything else regenerates on every start.</p>
+<p>Changing <code>MATELOT_DOMAIN</code> (or the scheme) after the first start is just <code>docker compose up -d</code>: Keycloak imported the
+realm once, so the one-shot <code>realm-sync</code> service updates the realm&#39;s redirect URIs and <code>sslRequired</code> through the admin
+API on every start (users untouched; <code>docker compose logs realm-sync</code>). Everything else regenerates on every start.</p>
 <h3 id="a4-backups-and-restore"><a class="anchor" href="#a4-backups-and-restore">A4. Backups and restore</a></h3>
 <pre><code class="language-bash">scripts/cell-backup.sh --compose . -d ./backups        # pg_dump of both databases + secrets + registry blobs → one archive
 scripts/cell-backup.sh --compose . --list              # archives on the backups volume
