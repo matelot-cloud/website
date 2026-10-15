@@ -928,6 +928,46 @@ Path flags: <code>--org</code>, <code>--project</code>, <code>--service</code>, 
 <td>Disconnect: keep the connection, forget the credentials</td>
 </tr>
 </tbody></table>
+<h3 id="members"><a class="anchor" href="#members">members</a></h3>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>API</th>
+<th>Does</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>matelot members list</code></td>
+<td><code>GET /members</code></td>
+<td>Members of a scope, direct and inherited (--scope organizations/ID | workspaces/ID | teams/ID | projects/ID)</td>
+</tr>
+<tr>
+<td><code>matelot members roles</code></td>
+<td><code>GET /members/roles</code></td>
+<td>Roles offered at a scope, with the GitLab equivalent and whether you may grant each (--scope projects/ID)</td>
+</tr>
+<tr>
+<td><code>matelot members candidates</code></td>
+<td><code>GET /members/candidates</code></td>
+<td>People (and this scope&#39;s service accounts) you can add (--scope projects/ID --q jane)</td>
+</tr>
+<tr>
+<td><code>matelot members add</code></td>
+<td><code>POST /members</code></td>
+<td>Add or invite people (--scope projects/ID --role DEVELOPER --email a@x,b@x | --users ID,ID [--expires 2027-03-31] [--reason …]); unknown e-mails are invited (setup link printed when there is no SMTP)</td>
+</tr>
+<tr>
+<td><code>matelot members update</code></td>
+<td><code>PATCH /members/:id</code></td>
+<td>Change a direct membership (--id MEMBERSHIP [--role TEAM_LEAD] [--expires 2027-03-31 | none])</td>
+</tr>
+<tr>
+<td><code>matelot members remove</code></td>
+<td><code>DELETE /members/:id</code></td>
+<td>Remove a direct membership (--id MEMBERSHIP [--reason …])</td>
+</tr>
+</tbody></table>
 <h3 id="users"><a class="anchor" href="#users">users</a></h3>
 <table>
 <thead>
@@ -940,7 +980,132 @@ Path flags: <code>--org</code>, <code>--project</code>, <code>--service</code>, 
 <tbody><tr>
 <td><code>matelot users list</code></td>
 <td><code>GET /admin/users</code></td>
-<td>Users (platform admin)</td>
+<td>Users of the cell (cell admins and root-organization admins; --kind human|service_account)</td>
+</tr>
+<tr>
+<td><code>matelot users capabilities</code></td>
+<td><code>GET /admin/users/capabilities</code></td>
+<td>What user administration can do on this cell (Keycloak admin API, e-mail)</td>
+</tr>
+<tr>
+<td><code>matelot users show</code></td>
+<td><code>GET /admin/users/:id</code></td>
+<td>A user&#39;s roles across scopes and tokens (--id USER)</td>
+</tr>
+<tr>
+<td><code>matelot users create</code></td>
+<td><code>POST /admin/users</code></td>
+<td>Create a user (--email [--first-name --last-name] [--temporary-password …]); without a password a one-time setup link is issued (e-mailed, or printed when there is no SMTP)</td>
+</tr>
+<tr>
+<td><code>matelot users disable</code></td>
+<td><code>PATCH /admin/users/:id</code></td>
+<td>Disable a user: roles kept, sign-in and tokens refused, sessions ended (--id USER)</td>
+</tr>
+<tr>
+<td><code>matelot users enable</code></td>
+<td><code>PATCH /admin/users/:id</code></td>
+<td>Enable a user again (--id USER)</td>
+</tr>
+<tr>
+<td><code>matelot users reset-password</code></td>
+<td><code>POST /admin/users/:id/reset-password</code></td>
+<td>Reset a password (--id USER [--temporary-password …]); without one a one-time reset link is issued</td>
+</tr>
+<tr>
+<td><code>matelot users delete</code></td>
+<td><code>DELETE /admin/users/:id</code></td>
+<td>Delete a user with their roles and tokens (--id USER [--reason …]); a sole organization admin is refused</td>
+</tr>
+</tbody></table>
+<h3 id="service-accounts"><a class="anchor" href="#service-accounts">service-accounts</a></h3>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>API</th>
+<th>Does</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>matelot service-accounts list</code></td>
+<td><code>GET /service-accounts</code></td>
+<td>Service accounts owned by a scope (--scope projects/ID)</td>
+</tr>
+<tr>
+<td><code>matelot service-accounts create</code></td>
+<td><code>POST /service-accounts</code></td>
+<td>Create a bot owned by a scope (--scope projects/ID --name &quot;Jira sync&quot; [--role DEVELOPER] [--description …])</td>
+</tr>
+<tr>
+<td><code>matelot service-accounts disable</code></td>
+<td><code>PATCH /service-accounts/:id</code></td>
+<td>Disable a service account (its tokens stop working)</td>
+</tr>
+<tr>
+<td><code>matelot service-accounts enable</code></td>
+<td><code>PATCH /service-accounts/:id</code></td>
+<td>Enable a service account</td>
+</tr>
+<tr>
+<td><code>matelot service-accounts delete</code></td>
+<td><code>DELETE /service-accounts/:id</code></td>
+<td>Delete a service account with its roles and tokens (--id SA)</td>
+</tr>
+<tr>
+<td><code>matelot service-accounts tokens</code></td>
+<td><code>GET /service-accounts/:id/tokens</code></td>
+<td>Tokens of a service account (--id SA)</td>
+</tr>
+<tr>
+<td><code>matelot service-accounts token-create</code></td>
+<td><code>POST /service-accounts/:id/tokens</code></td>
+<td>New token for a service account (--id SA --name ci --token-scope read|write --days 90); printed once</td>
+</tr>
+<tr>
+<td><code>matelot service-accounts token-rotate</code></td>
+<td><code>POST /service-accounts/:id/tokens/:tokenId/rotate</code></td>
+<td>Rotate a token: a new one with the same name, scope and lifetime; the old one stops now (--id SA --token-id T)</td>
+</tr>
+<tr>
+<td><code>matelot service-accounts token-revoke</code></td>
+<td><code>DELETE /service-accounts/:id/tokens/:tokenId</code></td>
+<td>Revoke a service-account token (--id SA --token-id T)</td>
+</tr>
+</tbody></table>
+<h3 id="access-token"><a class="anchor" href="#access-token">access-token</a></h3>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>API</th>
+<th>Does</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>matelot access-token create</code></td>
+<td><code>POST /scope-access-tokens</code></td>
+<td>Scope access token (GitLab &quot;project access token&quot;): a bot member + its token in one step (--scope projects/ID --name Renovate --role DEVELOPER --token-scope read|write --days 90)</td>
+</tr>
+</tbody></table>
+<h3 id="invite"><a class="anchor" href="#invite">invite</a></h3>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>API</th>
+<th>Does</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>matelot invite show</code></td>
+<td><code>GET /invites/:inviteToken</code></td>
+<td>What a one-time setup link is for (--link https://…/invite/TOKEN)</td>
+</tr>
+<tr>
+<td><code>matelot invite accept</code></td>
+<td><code>POST /invites/:inviteToken</code></td>
+<td>Set the password through a one-time setup link (--link … --password …) — no sign-in needed</td>
 </tr>
 </tbody></table>
 <h3 id="memberships"><a class="anchor" href="#memberships">memberships</a></h3>
@@ -955,7 +1120,7 @@ Path flags: <code>--org</code>, <code>--project</code>, <code>--service</code>, 
 <tbody><tr>
 <td><code>matelot memberships list</code></td>
 <td><code>GET /memberships</code></td>
-<td>Memberships of a scope (--scope-type PROJECT --scope-id ID)</td>
+<td>Direct memberships of a scope (--scope-type PROJECT --scope-id ID); <code>matelot members list</code> also shows the inherited ones</td>
 </tr>
 </tbody></table>
 <h3 id="membership"><a class="anchor" href="#membership">membership</a></h3>
@@ -970,7 +1135,7 @@ Path flags: <code>--org</code>, <code>--project</code>, <code>--service</code>, 
 <tbody><tr>
 <td><code>matelot membership grant</code></td>
 <td><code>POST /memberships</code></td>
-<td>Grant a role (--email --role DEVELOPER --scope-type PROJECT --scope-id ID)</td>
+<td>Grant a role (--email --role DEVELOPER --scope-type PROJECT --scope-id ID [--expires 2027-03-31]); same rules as <code>matelot members add</code></td>
 </tr>
 </tbody></table>
 <h3 id="meta"><a class="anchor" href="#meta">meta</a></h3>
@@ -1199,7 +1364,7 @@ or a personal <code>write</code>/<code>sudo</code> token.</p>
 </article>
     <footer>Matelot documentation · v0.1 · <a href="../../">home</a> · <a href="https://github.com/matelot-cloud/matelot/discussions" target="_blank" rel="noopener">questions</a> · <a href="https://github.com/matelot-cloud/matelot/releases" target="_blank" rel="noopener">releases</a></footer>
   </main>
-  <nav class="toc"><div class="toc-title">On this page</div><ul><li class="d2"><a href="#delivery-commands">Delivery commands</a></li><li class="d2"><a href="#resource-commands">Resource commands</a></li><li class="d3"><a href="#me">me</a></li><li class="d3"><a href="#orgs">orgs</a></li><li class="d3"><a href="#org">org</a></li><li class="d3"><a href="#workspaces">workspaces</a></li><li class="d3"><a href="#teams">teams</a></li><li class="d3"><a href="#projects">projects</a></li><li class="d3"><a href="#project">project</a></li><li class="d3"><a href="#services">services</a></li><li class="d3"><a href="#service">service</a></li><li class="d3"><a href="#envs">envs</a></li><li class="d3"><a href="#env">env</a></li><li class="d3"><a href="#releases">releases</a></li><li class="d3"><a href="#release">release</a></li><li class="d3"><a href="#images">images</a></li><li class="d3"><a href="#image">image</a></li><li class="d3"><a href="#inventory">inventory</a></li><li class="d3"><a href="#deployments">deployments</a></li><li class="d3"><a href="#sboms">sboms</a></li><li class="d3"><a href="#sbom">sbom</a></li><li class="d3"><a href="#components">components</a></li><li class="d3"><a href="#findings">findings</a></li><li class="d3"><a href="#finding">finding</a></li><li class="d3"><a href="#code-findings">code-findings</a></li><li class="d3"><a href="#code-finding">code-finding</a></li><li class="d3"><a href="#vulnerabilities">vulnerabilities</a></li><li class="d3"><a href="#risk">risk</a></li><li class="d3"><a href="#graph">graph</a></li><li class="d3"><a href="#policies">policies</a></li><li class="d3"><a href="#policy">policy</a></li><li class="d3"><a href="#gate">gate</a></li><li class="d3"><a href="#pipelines">pipelines</a></li><li class="d3"><a href="#pipeline">pipeline</a></li><li class="d3"><a href="#jobs">jobs</a></li><li class="d3"><a href="#job">job</a></li><li class="d3"><a href="#runners">runners</a></li><li class="d3"><a href="#runner">runner</a></li><li class="d3"><a href="#integrations">integrations</a></li><li class="d3"><a href="#repositories">repositories</a></li><li class="d3"><a href="#registry">registry</a></li><li class="d3"><a href="#registries">registries</a></li><li class="d3"><a href="#tokens">tokens</a></li><li class="d3"><a href="#token">token</a></li><li class="d3"><a href="#ci-tokens">ci-tokens</a></li><li class="d3"><a href="#ci-token">ci-token</a></li><li class="d3"><a href="#audit">audit</a></li><li class="d3"><a href="#users">users</a></li><li class="d3"><a href="#memberships">memberships</a></li><li class="d3"><a href="#membership">membership</a></li><li class="d3"><a href="#meta">meta</a></li><li class="d2"><a href="#policy-rule-flags">Policy rule flags</a></li><li class="d2"><a href="#examples">Examples</a></li><li class="d3"><a href="#templates-exceptions">templates &amp; exceptions</a></li><li class="d3"><a href="#remediation-m9">remediation (M9)</a></li><li class="d3"><a href="#scoped-remediation-settings-issue-trackers-m9-slice-2">Scoped remediation settings, issue trackers (M9 slice 2)</a></li><li class="d3"><a href="#mcp-m11">MCP (M11)</a></li><li class="d3"><a href="#cra-evidence-m10">CRA evidence (M10)</a></li><li class="d3"><a href="#notifications-vex">notifications &amp; VEX</a></li><li class="d3"><a href="#workspace-team-scope">workspace / team scope</a></li><li class="d3"><a href="#configuration-as-code">configuration as code</a></li></ul></nav>
+  <nav class="toc"><div class="toc-title">On this page</div><ul><li class="d2"><a href="#delivery-commands">Delivery commands</a></li><li class="d2"><a href="#resource-commands">Resource commands</a></li><li class="d3"><a href="#me">me</a></li><li class="d3"><a href="#orgs">orgs</a></li><li class="d3"><a href="#org">org</a></li><li class="d3"><a href="#workspaces">workspaces</a></li><li class="d3"><a href="#teams">teams</a></li><li class="d3"><a href="#projects">projects</a></li><li class="d3"><a href="#project">project</a></li><li class="d3"><a href="#services">services</a></li><li class="d3"><a href="#service">service</a></li><li class="d3"><a href="#envs">envs</a></li><li class="d3"><a href="#env">env</a></li><li class="d3"><a href="#releases">releases</a></li><li class="d3"><a href="#release">release</a></li><li class="d3"><a href="#images">images</a></li><li class="d3"><a href="#image">image</a></li><li class="d3"><a href="#inventory">inventory</a></li><li class="d3"><a href="#deployments">deployments</a></li><li class="d3"><a href="#sboms">sboms</a></li><li class="d3"><a href="#sbom">sbom</a></li><li class="d3"><a href="#components">components</a></li><li class="d3"><a href="#findings">findings</a></li><li class="d3"><a href="#finding">finding</a></li><li class="d3"><a href="#code-findings">code-findings</a></li><li class="d3"><a href="#code-finding">code-finding</a></li><li class="d3"><a href="#vulnerabilities">vulnerabilities</a></li><li class="d3"><a href="#risk">risk</a></li><li class="d3"><a href="#graph">graph</a></li><li class="d3"><a href="#policies">policies</a></li><li class="d3"><a href="#policy">policy</a></li><li class="d3"><a href="#gate">gate</a></li><li class="d3"><a href="#pipelines">pipelines</a></li><li class="d3"><a href="#pipeline">pipeline</a></li><li class="d3"><a href="#jobs">jobs</a></li><li class="d3"><a href="#job">job</a></li><li class="d3"><a href="#runners">runners</a></li><li class="d3"><a href="#runner">runner</a></li><li class="d3"><a href="#integrations">integrations</a></li><li class="d3"><a href="#repositories">repositories</a></li><li class="d3"><a href="#registry">registry</a></li><li class="d3"><a href="#registries">registries</a></li><li class="d3"><a href="#tokens">tokens</a></li><li class="d3"><a href="#token">token</a></li><li class="d3"><a href="#ci-tokens">ci-tokens</a></li><li class="d3"><a href="#ci-token">ci-token</a></li><li class="d3"><a href="#audit">audit</a></li><li class="d3"><a href="#members">members</a></li><li class="d3"><a href="#users">users</a></li><li class="d3"><a href="#service-accounts">service-accounts</a></li><li class="d3"><a href="#access-token">access-token</a></li><li class="d3"><a href="#invite">invite</a></li><li class="d3"><a href="#memberships">memberships</a></li><li class="d3"><a href="#membership">membership</a></li><li class="d3"><a href="#meta">meta</a></li><li class="d2"><a href="#policy-rule-flags">Policy rule flags</a></li><li class="d2"><a href="#examples">Examples</a></li><li class="d3"><a href="#templates-exceptions">templates &amp; exceptions</a></li><li class="d3"><a href="#remediation-m9">remediation (M9)</a></li><li class="d3"><a href="#scoped-remediation-settings-issue-trackers-m9-slice-2">Scoped remediation settings, issue trackers (M9 slice 2)</a></li><li class="d3"><a href="#mcp-m11">MCP (M11)</a></li><li class="d3"><a href="#cra-evidence-m10">CRA evidence (M10)</a></li><li class="d3"><a href="#notifications-vex">notifications &amp; VEX</a></li><li class="d3"><a href="#workspace-team-scope">workspace / team scope</a></li><li class="d3"><a href="#configuration-as-code">configuration as code</a></li></ul></nav>
 </div>
 <script src="site.js" defer></script>
 </body>

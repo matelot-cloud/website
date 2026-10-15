@@ -40,9 +40,15 @@
 </tr>
 <tr>
 <td><strong>Personal access token</strong> (user menu → Access tokens)</td>
-<td>people: scripts, the API, <code>secops</code> on a laptop</td>
+<td>people: scripts, the API, <code>matelot</code> on a laptop</td>
 <td>the user</td>
 <td>see scopes below</td>
+</tr>
+<tr>
+<td><strong>Service-account token</strong> (a scope&#39;s Members → Service accounts)</td>
+<td>integrations and automation that need a <em>role</em>: Jira sync, Renovate, a reporting job</td>
+<td>a bot user owned by that scope</td>
+<td>the bot&#39;s memberships (that scope and below) masked by <code>read</code> / <code>write</code></td>
 </tr>
 </tbody></table>
 <h2 id="personal-token-scopes"><a class="anchor" href="#personal-token-scopes">Personal token scopes</a></h2>
@@ -58,11 +64,57 @@ pipelines and pushes to the registry.</li>
 </ul>
 <p>A normal user&#39;s token therefore reaches exactly the projects they are assigned to; an admin&#39;s everyday token does the
 day-to-day work without being able to administer or delete, and admin power is opt-in per (short-lived) sudo token.</p>
+<h2 id="service-accounts-bots"><a class="anchor" href="#service-accounts-bots">Service accounts (bots)</a></h2>
+<p>A service account is a non-human user owned by an organization, workspace, team or project (GitLab: service accounts
+and group / project access tokens). It has no password and cannot sign in with a browser; it holds roles through
+ordinary memberships — only at the scope that owns it and below — and authenticates with its tokens, which are
+personal access tokens of the bot: same <code>spt_</code> format, same <code>read</code> / <code>write</code> mask (never <code>sudo</code>), expiry (at most
+<code>SERVICE_ACCOUNT_TOKEN_MAX_DAYS</code>, default 365), last use, rotation (a new token with the same name, scope and
+lifetime; the old one stops at once) and revocation. In member lists it carries a <em>bot</em> badge; its username is a
+reserved address (<code>bot-&lt;name&gt;-&lt;id&gt;@&lt;scope&gt;.bots.matelot.invalid</code>) nobody can sign in with.</p>
+<p><em>New access token</em> (GitLab &quot;project access token&quot;) creates the bot, its role and a token in one step:
+<code>matelot access-token create --scope projects/ID --name Renovate --role DEVELOPER --token-scope write --days 90</code>.</p>
+<p><strong>Service account or CI token?</strong> They are not two ways of doing the same thing:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>CI token</th>
+<th>Service account</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Is</td>
+<td>a credential of one scope, no identity</td>
+<td>an identity (a bot user) with roles</td>
+</tr>
+<tr>
+<td>Rights</td>
+<td>a permission preset (<code>pipeline</code>, <code>deploy</code>, <code>registry</code>, <code>full</code>) + the environments it may deploy to</td>
+<td>the roles of its memberships, masked by the token&#39;s read / write scope</td>
+</tr>
+<tr>
+<td>Authenticates</td>
+<td>HMAC-signed requests (key id + secret, the secret never travels)</td>
+<td>bearer token <code>spt_…</code></td>
+</tr>
+<tr>
+<td>For</td>
+<td>pipelines: SBOM upload, gates, releases, deployments, registry push / promote</td>
+<td>integrations and automation acting as a member: reading findings, managing remediations, syncing issues</td>
+</tr>
+<tr>
+<td>Managed at</td>
+<td>Project / scope → Settings → CI tokens</td>
+<td>Members → Service accounts</td>
+</tr>
+</tbody></table>
 <h2 id="security-properties"><a class="anchor" href="#security-properties">Security properties</a></h2>
 <ul>
 <li><code>spt_</code> + 240 random bits; only the SHA-256 is stored; shown once.</li>
 <li>Expiry 1–365 days; revocable; last use (time, IP) tracked.</li>
-<li>A personal token cannot create or revoke tokens (sign in to the web app); CI tokens neither.</li>
+<li>A personal token cannot create or revoke tokens (sign in to the web app); CI tokens neither. Service-account tokens
+are managed by whoever holds <code>membership:write</code> at the bot&#39;s scope (sudo or the web session).</li>
 <li>Created / revoked events are audited in every organization the user belongs to.</li>
 <li>Everything done with a token is audited as the user.</li>
 </ul>
@@ -78,7 +130,7 @@ matelot whoami
 </article>
     <footer>Matelot documentation · v0.1 · <a href="../../">home</a> · <a href="https://github.com/matelot-cloud/matelot/discussions" target="_blank" rel="noopener">questions</a> · <a href="https://github.com/matelot-cloud/matelot/releases" target="_blank" rel="noopener">releases</a></footer>
   </main>
-  <nav class="toc"><div class="toc-title">On this page</div><ul><li class="d2"><a href="#personal-token-scopes">Personal token scopes</a></li><li class="d2"><a href="#security-properties">Security properties</a></li><li class="d2"><a href="#use">Use</a></li><li class="d2"><a href="#api-collection-and-checks">API collection and checks</a></li></ul></nav>
+  <nav class="toc"><div class="toc-title">On this page</div><ul><li class="d2"><a href="#personal-token-scopes">Personal token scopes</a></li><li class="d2"><a href="#service-accounts-bots">Service accounts (bots)</a></li><li class="d2"><a href="#security-properties">Security properties</a></li><li class="d2"><a href="#use">Use</a></li><li class="d2"><a href="#api-collection-and-checks">API collection and checks</a></li></ul></nav>
 </div>
 <script src="site.js" defer></script>
 </body>
