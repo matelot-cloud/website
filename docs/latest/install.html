@@ -230,7 +230,8 @@ docker compose down -v       # removes everything
 <td>about 2 vCPU and 5 GiB of memory requested across all components; Keycloak is the largest</td>
 </tr>
 </tbody></table>
-<p>Optional: an S3-compatible bucket for off-site backups, an SMTP relay for e-mail notifications, a GitHub App for
+<p>Optional: an S3-compatible bucket for off-site backups, an SMTP relay for e-mail notifications and member
+invitations (without one, invitation and password-reset links are shown once to copy), a GitHub App for
 GitHub repositories (any Git host also works with tokens).</p>
 <h3 id="b2-choose-the-cell-s-values"><a class="anchor" href="#b2-choose-the-cell-s-values">B2. Choose the cell&#39;s values</a></h3>
 <pre><code class="language-bash">helm show values oci://ghcr.io/matelot-cloud/charts/secops-cell --version 0.1.0 &gt; values.yaml
@@ -266,6 +267,10 @@ backup:
 <p>Images are <code>ghcr.io/matelot-cloud/{api,worker,web,runner}</code> at the chart&#39;s <code>appVersion</code>; leave the <code>image</code> blocks alone
 unless you mirror them. Everything else (replicas, resources, managed runner count, SMTP via <code>api.extraEnv</code>) has a
 documented default in <code>values.yaml</code>.</p>
+<p>Member management needs nothing extra: with the bundled Keycloak the API reaches its admin API in-cluster
+(<code>KEYCLOAK_ADMIN_URL</code>, set by the chart and by Compose) to create invited users and set passwords. Optional API
+settings: <code>SERVICE_ACCOUNT_TOKEN_MAX_DAYS</code> (longest service-account token, default 365) and
+<code>MATELOT_FEATURES_DISABLED</code> (comma-separated capabilities to turn off, see <a href="roles.html">Roles</a>).</p>
 <h3 id="b3-install"><a class="anchor" href="#b3-install">B3. Install</a></h3>
 <pre><code class="language-bash">helm install acme oci://ghcr.io/matelot-cloud/charts/secops-cell --version 0.1.0 \
   --namespace tenant-acme --create-namespace -f values.yaml
@@ -282,11 +287,15 @@ kubectl -n tenant-acme logs job/acme-backup-first -f
 pair, the managed-runner secret); they survive upgrades and are part of every backup.</p>
 <h3 id="b4-first-login-and-identity"><a class="anchor" href="#b4-first-login-and-identity">B4. First login and identity</a></h3>
 <ol>
-<li>Open <code>https://auth-acme.platform.example.com</code> as the Keycloak admin (<code>keycloak.adminPassword</code>), realm <code>platform</code>,
-and add your identity provider (SAML or OIDC: Entra ID, Okta, Google Workspace…). Users are created on first
-login; the e-mail address is what Matelot keys users on.</li>
-<li>Open <code>https://acme.platform.example.com</code> and log in as one of <code>tenant.adminEmails</code>: that first login grants the
+<li>The administrators in <code>tenant.adminEmails</code> already exist in Keycloak: the install (and every upgrade) seeds the
+missing ones with a temporary password, kept in the release&#39;s Secret — the first login asks for a new one:<pre><code class="language-bash">kubectl -n tenant-acme get secret acme-keycloak -o jsonpath=&#39;{.data.SEED_ADMIN_PASSWORD}&#39; | base64 -d; echo
+</code></pre>
+(<code>keycloak.seedAdminPassword</code> sets it explicitly; <code>keycloak.seedAdmins: false</code> turns the seeding off; users that
+exist are never modified.) Open <code>https://acme.platform.example.com</code> and sign in: that first login grants the
 administrator role on the root organization. Invite the team from <strong>Members</strong>.</li>
+<li>For everyone else, open <code>https://auth-acme.platform.example.com</code> as the Keycloak admin (<code>keycloak.adminPassword</code>),
+realm <code>platform</code>, and add your identity provider (SAML or OIDC: Entra ID, Okta, Google Workspace…). Users are
+created on first login; the e-mail address is what Matelot keys users on.</li>
 <li>The Overview shows the organization setup: connect source code, check the managed runner, alerts, team. From
 there, create a project and a service, attach a repository and run the security pipeline.</li>
 </ol>
