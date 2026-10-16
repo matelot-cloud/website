@@ -43,7 +43,7 @@ Path flags: <code>--org</code>, <code>--project</code>, <code>--service</code>, 
 </tr>
 <tr>
 <td><code>matelot doctor [--url URL]</code></td>
-<td>health of a cell after an install or upgrade: API ready, version, OAuth discovery (JSON, endpoints on the cell&#39;s own URL), login, organization, runners online, registry; exit 1 when a check fails (<code>--json</code> for scripts). Run from the Compose folder (or <code>MATELOT_COMPOSE_DIR</code>), an unreachable API also names the container that is restarting or unhealthy and the <code>docker compose logs</code> command</td>
+<td>health of a cell after an install or upgrade: API ready, version, OAuth discovery (JSON, endpoints on the cell&#39;s own URL), login, organization, runners online, registry; exit 1 when a check fails (<code>--json</code> for scripts). Run from the Compose folder (or <code>MATELOT_COMPOSE_DIR</code>), an unreachable API also names the container that is restarting or unhealthy and the <code>docker compose logs</code> command. Every line goes to stdout; when the API is unreachable the version line is still printed as <em>skipped</em> with the cause — a certificate Node does not trust names the TLS error and <code>NODE_EXTRA_CA_CERTS</code></td>
 </tr>
 <tr>
 <td><code>matelot pipeline --service ID [--template security] [--ref SHA] [--wait --timeout S]</code></td>
