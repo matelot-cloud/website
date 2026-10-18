@@ -217,6 +217,13 @@ different role (a fixed role for <code>write</code> was tried first and kept bre
 <td>running pipelines, pushing, recording releases</td>
 </tr>
 <tr>
+<td><code>integration:connect</code></td>
+<td>❌</td>
+<td>✅</td>
+<td>✅</td>
+<td>connecting a git host or registry to a project, team or workspace (at organization level also <code>organization:write</code>: an owner)</td>
+</tr>
+<tr>
 <td><code>vulnerability:write</code>, <code>exception:write</code>, <code>policy:exception_request</code>, <code>evidence:write</code>, <code>risk:write</code>, <code>incident:write</code></td>
 <td>❌</td>
 <td>✅</td>
@@ -238,11 +245,11 @@ different role (a fixed role for <code>write</code> was tried first and kept bre
 <td>members and roles</td>
 </tr>
 <tr>
-<td><code>integration:write</code>, <code>integration:connect</code></td>
+<td><code>integration:write</code></td>
 <td>❌</td>
 <td>❌</td>
 <td>✅</td>
-<td>connections hold credentials</td>
+<td>changing or rotating credentials, disconnecting, syncing on demand, deleting a connection</td>
 </tr>
 <tr>
 <td><code>policy:write</code></td>
@@ -328,6 +335,12 @@ removes, it never adds.</p>
 <td>✅</td>
 </tr>
 <tr>
+<td>connect a git host / registry to a project, team or workspace</td>
+<td>❌</td>
+<td>✅</td>
+<td>✅</td>
+</tr>
+<tr>
 <td>approve an exception, accept a risk</td>
 <td>❌</td>
 <td>❌</td>
@@ -340,7 +353,7 @@ removes, it never adds.</p>
 <td>✅</td>
 </tr>
 <tr>
-<td>grant a membership, connect an integration, organization settings, manage runner pools</td>
+<td>grant a membership, connect at organization level, disconnect / rotate credentials, organization settings, manage runner pools</td>
 <td>❌</td>
 <td>❌</td>
 <td>✅</td>

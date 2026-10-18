@@ -229,8 +229,8 @@ Path flags: <code>--org</code>, <code>--project</code>, <code>--service</code>, 
 </thead>
 <tbody><tr>
 <td><code>matelot service show</code></td>
-<td><code>GET /services/:service</code></td>
-<td>Service details</td>
+<td><code>GET /services/:service/summary</code></td>
+<td>The service with its latest pipeline (jobs), open findings by severity (+ KEV), open code findings and newest SBOM — one call for CI scripts (<code>--json</code>)</td>
 </tr>
 </tbody></table>
 <h3 id="envs"><a class="anchor" href="#envs">envs</a></h3>
@@ -610,7 +610,7 @@ Path flags: <code>--org</code>, <code>--project</code>, <code>--service</code>, 
 <tbody><tr>
 <td><code>matelot policy create</code></td>
 <td><code>POST /organizations/:org/policies</code></td>
-<td>Create at the organization (--name --environments prod,staging --max-severity high --block-kev --block-secrets --require-sbom --max-iac high --action block</td>
+<td>Create at the organization (--name --environments prod,staging --max-severity high --block-kev --block-secrets --require-sbom --max-iac SEV --max-sast SEV --action block</td>
 </tr>
 <tr>
 <td><code>matelot policy create-project</code></td>
@@ -1154,12 +1154,18 @@ Path flags: <code>--org</code>, <code>--project</code>, <code>--service</code>, 
 </tr>
 </tbody></table>
 <h2 id="policy-rule-flags"><a class="anchor" href="#policy-rule-flags">Policy rule flags</a></h2>
-<p><code>--name</code>, <code>--description</code>, <code>--environments production,staging</code> (empty = all), <code>--max-severity critical|high|medium|low|none</code>, <code>--block-kev [false]</code>, <code>--block-secrets [false]</code>, <code>--require-sbom [false]</code>, <code>--max-iac critical|high|medium|low</code>, <code>--honour-decisions [false]</code>, <code>--action block|warn</code>, <code>--enforce [false]</code>.</p>
+<p><code>--name</code>, <code>--description</code>, <code>--environments production,staging</code> (empty = all), <code>--max-severity critical|high|medium|low|none</code>, <code>--block-kev</code> / <code>--no-block-kev</code>, <code>--block-secrets</code> / <code>--no-block-secrets</code>, <code>--require-sbom</code> / <code>--no-require-sbom</code>, <code>--max-iac critical|high|medium|low|none</code>, <code>--max-sast …</code>, <code>--honour-decisions</code> / <code>--no-honour-decisions</code>, <code>--action block|warn</code>, <code>--enforce [false]</code>.</p>
 <pre><code class="language-bash">matelot policy create --name &quot;Production baseline&quot; --environments production --max-severity high --block-kev --block-secrets --require-sbom --action block --enforce
 matelot policy create-project --project $PROJ --name &quot;Dev advisory&quot; --environments development --max-severity high --action warn
 matelot policy update --id $POLICY --enabled false
 matelot policies in-force --project $PROJ
 </code></pre>
+<p><strong>Every rule is explicit.</strong> <code>policy create</code> sends all seven rules: a block rule you did not ask for is <strong>off</strong>
+(<code>--max-severity high --block-kev</code> blocks on severity and KEV, nothing else — no surprise <code>block_secrets</code> violation),
+decisions are honoured unless <code>--no-honour-decisions</code>. <code>policy update</code> sends only the flags you give; <code>--no-…</code> turns a
+rule off. <code>policies list</code> and <code>policies in-force</code> show the rules of each policy in one column
+(<code>max high · kev · secrets · sbom · iac medium</code>). The API behaves the same for a new policy: a boolean rule missing
+from <code>rules</code> is off; the web form shows every rule as a checkbox.</p>
 <h2 id="examples"><a class="anchor" href="#examples">Examples</a></h2>
 <pre><code class="language-bash">matelot findings list --project $PROJ --severity critical,high --status open
 matelot findings environments --project $PROJ
