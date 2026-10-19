@@ -163,6 +163,11 @@ docker push &quot;$(matelot registry path --service &lt;serviceId&gt;)&quot;:1  
 <td>14</td>
 <td>archives kept on the backups volume</td>
 </tr>
+<tr>
+<td><code>MATELOT_THEME_LOGO</code> / <code>MATELOT_THEME_PRIMARY_COLOR</code></td>
+<td>empty</td>
+<td>the sign-in page&#39;s logo (URL or data: URI) and button / link colour (see <em>Branding the sign-in page</em> below)</td>
+</tr>
 </tbody></table>
 <p>Changing <code>MATELOT_DOMAIN</code> (or the scheme) after the first start is just <code>docker compose up -d</code>: Keycloak imported the
 realm once, so the one-shot <code>realm-sync</code> service updates the realm&#39;s redirect URIs and <code>sslRequired</code> through the admin
@@ -267,6 +272,12 @@ backup:
 <p>Images are <code>ghcr.io/matelot-cloud/{api,worker,web,runner}</code> at the chart&#39;s <code>appVersion</code>; leave the <code>image</code> blocks alone
 unless you mirror them. Everything else (replicas, resources, managed runner count, SMTP via <code>api.extraEnv</code>) has a
 documented default in <code>values.yaml</code>.</p>
+<p><strong>Branding the sign-in page.</strong> Sign-in, OTP, password-reset and consent pages are Keycloak&#39;s, rendered with the
+cell&#39;s <code>matelot</code> login theme: your organization&#39;s name as the heading and in the tab title, the product logo, the
+app&#39;s colours in light and dark mode. To show your own logo and colour instead, set <code>keycloak.theme.logo</code> (a URL or
+<code>data:</code> URI) and <code>keycloak.theme.primaryColor</code> (<code>primaryColorHover</code> optional) in the values file — on Compose
+<code>MATELOT_THEME_LOGO</code> / <code>MATELOT_THEME_PRIMARY_COLOR</code> in <code>.env</code>; <code>keycloak.theme.enabled: false</code> restores the stock
+Keycloak look. The theme overrides no Keycloak template, so Keycloak upgrades keep working.</p>
 <p>Member management needs nothing extra: with the bundled Keycloak the API reaches its admin API in-cluster
 (<code>KEYCLOAK_ADMIN_URL</code>, set by the chart and by Compose) to create invited users and set passwords. Optional API
 settings: <code>SERVICE_ACCOUNT_TOKEN_MAX_DAYS</code> (longest service-account token, default 365) and
