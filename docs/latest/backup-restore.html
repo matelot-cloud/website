@@ -86,6 +86,10 @@ never attach an archive to a ticket.</p>
     credentialsSecret: &quot;&quot;     # Secret with AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY, or empty for IRSA / workload identity
     endpoint: &quot;&quot;              # S3-compatible endpoint for MinIO / Ceph
 </code></pre>
+<p>Every run reports its outcome to the cell&#39;s API (a generated <code>BACKUP_REPORT_TOKEN</code>; the S3 upload reports too), so
+<code>matelot_backup_last_success_timestamp_seconds</code>, <code>matelot_backup_last_failure_timestamp_seconds</code> and
+<code>matelot_backup_last_duration_seconds</code> are on the worker&#39;s <code>/metrics</code> — alert on the first growing older than a day
+(docs/observability.md). A report that cannot be delivered never fails the backup. Docker Compose reports the same way.</p>
 <p><code>make deploy</code> (or <code>helm upgrade</code>) creates the CronJob <code>&lt;release&gt;-backup</code>, the PVC <code>&lt;release&gt;-backups</code> (kept on
 uninstall) and the script ConfigMap. On a StorageClass with <code>volumeBindingMode: WaitForFirstConsumer</code> (kind, EKS gp3,
 GKE, AKS defaults) that PVC stays <strong>Pending until the first backup runs</strong> — normal, but it means <code>helm … --wait</code> on

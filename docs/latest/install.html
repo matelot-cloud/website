@@ -168,6 +168,16 @@ docker push &quot;$(matelot registry path --service &lt;serviceId&gt;)&quot;:1  
 <td>empty</td>
 <td>the sign-in page&#39;s logo (URL or data: URI) and button / link colour (see <em>Branding the sign-in page</em> below)</td>
 </tr>
+<tr>
+<td><code>COMPOSE_PROFILES</code></td>
+<td>empty</td>
+<td><code>observability</code> adds Prometheus, Tempo, Loki, Grafana (at <code>&lt;domain&gt;/grafana/</code>, Keycloak sign-in; local admin password in <code>docker compose run --rm init show</code>), Alloy and the exporters — nothing published on the host (docs/observability.md)</td>
+</tr>
+<tr>
+<td><code>MATELOT_OTLP_ENDPOINT</code> / <code>_PROTOCOL</code> / <code>_HEADERS</code> / <code>MATELOT_TRACES_SAMPLER</code></td>
+<td>empty</td>
+<td>traces to your own collector instead (docs/observability.md)</td>
+</tr>
 </tbody></table>
 <p>Changing <code>MATELOT_DOMAIN</code> (or the scheme) after the first start is just <code>docker compose up -d</code>: Keycloak imported the
 realm once, so the one-shot <code>realm-sync</code> service updates the realm&#39;s redirect URIs and <code>sslRequired</code> through the admin
