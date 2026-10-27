@@ -1,0 +1,887 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Observability: metrics, traces, logs, alerts · Matelot docs</title>
+<link rel="icon" href="../../assets/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
+<meta name="docs-version" content="latest">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../../"><img src="../../assets/logo.png" alt="">Matelot<span class="dim">docs</span></a>
+  <nav class="top-links"><a href="../../">Home</a><a class="current" href="index.html">Docs</a><a href="install.html">Install</a><a href="https://github.com/matelot-cloud/matelot" target="_blank" rel="noopener">GitHub</a></nav>
+  <div class="search"><input id="q" type="search" placeholder="Search the docs…" autocomplete="off" aria-label="Search"><div id="results" class="results" hidden></div></div>
+  <label class="version"><span class="sr-only">Version</span><select id="version" aria-label="Documentation version"><option value="latest">latest</option></select></label>
+</header>
+<div class="page">
+  <button class="nav-toggle" aria-expanded="false" aria-controls="side">Contents</button>
+  <nav class="side" id="side"><ul><li class="section"><span>Start here</span><ul><li><a href="index.html">Documentation</a></li><li><a href="install.html">Install Matelot</a></li><li><a href="product.html">What the platform does</a></li><li><a href="roles.html">Roles and permissions</a></li><li><a href="coverage.html">Service coverage</a></li></ul></li><li class="section"><span>CLI and automation</span><ul><li><a href="cli.html">CLI guide</a></li><li><a href="cli-reference.html">Command reference</a></li><li><a href="ci-integration.html">CI/CD integration</a></li><li><a href="access-tokens.html">Access tokens</a></li><li><a href="mcp.html">MCP server (AI assistants)</a></li></ul></li><li class="section"><span>Connections and registries</span><ul><li><a href="github-app.html">GitHub App</a></li><li><a href="keyless-registries.html">Keyless registry access</a></li><li><a href="builds-releases-deployments.html">Builds, releases, deployments</a></li></ul></li><li class="section"><span>Runners</span><ul><li><a href="managed-runners.html">Managed runners</a></li><li><a href="runner-protocol.html">Runner protocol</a></li></ul></li><li class="section"><span>Operating a cell</span><ul><li><a href="backup-restore.html">Backup and restore</a></li><li><a href="usage-and-limits.html">Usage and rate limits</a></li><li><a href="endpoints.html">Endpoints of a cell</a></li><li class="current"><a href="observability.html">Observability: metrics, traces, logs, alerts</a></li></ul></li><li class="section"><span>Reference</span><ul><li><a href="parity-matrix.html">UI / API / CLI / MCP parity</a></li><li><a href="adr-0001.html">ADR 1: tenancy and stack</a></li><li><a href="adr-0002.html">ADR 2: web app</a></li><li><a href="adr-0003.html">ADR 3: two-level RBAC</a></li><li><a href="adr-0004.html">ADR 4: observability</a></li></ul></li></ul></nav>
+  <main class="content">
+    <div class="crumbs">Operating a cell</div>
+    <article><h1 id="observability-design"><a class="anchor" href="#observability-design">Observability — design</a></h1>
+<p><strong>Status:</strong> design accepted (ADR 0004); <strong>drop 1 (instrumentation) shipped</strong>, drops 2–4 pending (plan at the end).
+This page becomes the customer-facing <code>docs/observability.md</code> with the fourth drop; until then it is the
+specification the drops are checked against. <code>docs/roadmap/v1.md</code> (M14) is the single place where status is ticked.</p>
+<h2 id="goal"><a class="anchor" href="#goal">Goal</a></h2>
+<p>A cell is observable out of the box, <strong>with the customer&#39;s existing stack</strong>. Every signal is standard — OTLP for
+traces and logs, Prometheus exposition for metrics, JSON logs that carry the trace id — and we ship the dashboards
+and alert rules. Nothing needs <em>our</em> Grafana: a customer with kube-prometheus-stack, Grafana Cloud, Datadog or an
+OTel Collector of their own points one endpoint at the cell and is done. The Docker Compose quick start can bring a
+small stack up on the same host with one profile, for evaluation and small teams.</p>
+<h2 id="what-a-cell-emits"><a class="anchor" href="#what-a-cell-emits">What a cell emits</a></h2>
+<table>
+<thead>
+<tr>
+<th>Signal</th>
+<th>Producer</th>
+<th>Transport</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Metrics</td>
+<td>api, worker, runner (agent), Postgres and Redis exporters, registry, Keycloak</td>
+<td>Prometheus exposition on a <strong>separate port 9464</strong> per pod (<code>/metrics</code>, no auth, never on the ingress); optional OTLP push</td>
+<td>on</td>
+</tr>
+<tr>
+<td>Traces</td>
+<td>api, worker, runner</td>
+<td>OTLP (gRPC or HTTP/protobuf) to <code>OTEL_EXPORTER_OTLP_ENDPOINT</code></td>
+<td>off until an endpoint is set</td>
+</tr>
+<tr>
+<td>Logs</td>
+<td>api, worker, runner</td>
+<td>JSON on stdout (pino), one schema, <code>trace_id</code> / <code>span_id</code> / <code>request_id</code> on every line; collected by whatever reads container logs (Promtail / Alloy / Fluent Bit); optional OTLP</td>
+<td>on</td>
+</tr>
+</tbody></table>
+<p>Resource attributes on everything: <code>service.name</code> (<code>matelot-api</code> / <code>matelot-worker</code> / <code>matelot-runner</code>),
+<code>service.version</code> (the image tag, from <code>APP_VERSION</code>), <code>deployment.environment</code> (<code>DEPLOYMENT_ENVIRONMENT</code>, default
+<code>production</code>), <code>matelot.cell</code> (the tenant slug, <code>TENANT_SLUG</code>), <code>k8s.*</code> / <code>container.*</code> from the collector where
+one runs. The runner adds <code>matelot.runner.name</code> and <code>matelot.runner.pool</code>.</p>
+<h3 id="traces"><a class="anchor" href="#traces">Traces</a></h3>
+<p>The OpenTelemetry SDK (<code>sdk-trace-node</code>) with the instrumentations for <code>http</code>, <code>express</code> (Nest runs on it; only the
+route template, no per-middleware spans), <code>pg</code>, <code>ioredis</code> and <code>undici</code>/<code>fetch</code> in the API and the worker, started by
+<code>apps/api/src/telemetry/tracing.ts</code>, preloaded with <code>node -r ./dist/telemetry/tracing.js</code> before Nest (the images&#39;
+entrypoints, Compose, <code>pnpm start</code>) — instrumentation must patch the modules before they load. Its contract:</p>
+<ul>
+<li><strong>A fast no-op when off.</strong> Off is the default without an OTLP endpoint, or <code>MATELOT_TRACING_ENABLED=false</code>: the
+preload returns after one environment read, loads no SDK module and patches nothing (<code>tracing.spec.ts</code> asserts
+<code>require.cache</code>).</li>
+<li><strong>Never in the request path.</strong> A <code>BatchSpanProcessor</code> exports asynchronously with a bounded queue (2048 spans, 512
+per batch, 5 s export timeout); an unreachable collector costs dropped spans and ONE warning per failure shape
+(counted, reported at shutdown) — never a slow request or a failed <code>/health/live</code>.</li>
+<li><strong>Clean shutdown.</strong> SIGTERM / SIGINT and Nest&#39;s shutdown hook flush the queue with a 5 s cap, so the last spans of
+a pipeline job survive a pod rollout.</li>
+</ul>
+<p>BullMQ needs no instrumentation package: <code>QueueService.enqueue</code> puts the active <code>traceparent</code> into the job data and
+the worker&#39;s handlers run under it. The runner ships <strong>no dependencies</strong> (its image carries no <code>node_modules</code>), so it
+has its own 300-line <code>telemetry.ts</code> with the same contract: W3C <code>traceparent</code> in, OTLP/HTTP JSON out (batched,
+bounded, one warning, 5 s shutdown cap; <code>grpc</code> endpoints are refused with a warning), an <code>AsyncLocalStorage</code> current
+span, child spans per phase.</p>
+<p><strong>One trace per pipeline, end to end.</strong> The pipeline queue is the <code>jobs</code> table (claimed by runners through
+<code>POST /runner/jobs/claim</code>), not BullMQ, so propagation goes through our own protocol:</p>
+<ul>
+<li><strong>Ids are fixed when the pipeline is created, spans are emitted when things end.</strong> <code>PipelineTelemetry.newTrace()</code>
+draws a trace id, a root span id for the pipeline and a span id per job, stored as W3C traceparents on the rows
+(<code>pipelines.trace_parent</code>, <code>jobs.trace_parent</code>, migration 0049). The pipeline&#39;s root span (<code>pipeline &lt;name&gt;</code>, start
+= created, end = terminal status) and each job&#39;s span (<code>job &lt;kind&gt;</code>, start = created so the queue wait is in it,
+events <code>claimed</code> / <code>started</code>, attributes <code>matelot.job.kind</code> = the job <code>type</code> — <code>repository_check</code>, <code>sbom</code>, <code>sca</code>,
+<code>sast</code>, <code>secrets</code>, <code>iac</code>, <code>policy_eval</code>, … — <code>matelot.job.id</code>, <code>matelot.pipeline.id</code>, project / service /
+organization ids, <code>matelot.runner.name</code>, <code>matelot.job.exit_code</code>, status) are emitted with those ids by whichever
+process finishes them (<code>PinnedIdGenerator</code>, <code>telemetry/ids.ts</code>): nothing is held in memory between requests, so
+API restarts and several replicas can neither lose nor duplicate a span. A retried job gets a new span id in the
+same trace.</li>
+<li>The claim response carries the job&#39;s traceparent (<code>Job.traceParent</code>); the runner starts <code>job run &lt;kind&gt;</code> under it
+with a child per phase (<code>checkout</code>, <code>tool syft</code> / <code>tool trivy</code> / <code>tool semgrep</code>, <code>upload sbom</code>, <code>upload findings</code>,
+<code>correlate</code>) and sends the <code>traceparent</code> header on every call back (<code>/start</code>, <code>/logs</code>, <code>/sbom</code>, <code>/code-findings</code>,
+<code>/complete</code>), so the API side of a job — SBOM ingestion, correlation, the gate — lands in the same trace.</li>
+<li>API → worker: <code>QueueService.enqueue</code> puts the active traceparent into the BullMQ job data (<code>__traceparent</code>), the
+handlers run under it (<code>queue github-sync</code>, <code>queue github-webhooks</code>). The worker&#39;s correlation loop runs as a root
+span <code>worker correlation</code>; the gate evaluation of a <code>policy_eval</code> job runs under that job&#39;s span (<code>gate evaluate</code>).</li>
+<li>Outbound integrations (GitHub, GitLab, Jira, registries, OSV / NVD mirrors) are <code>undici</code> client spans with
+<code>peer.service</code> set from the integration kind.</li>
+</ul>
+<p>Sampling: <code>OTEL_TRACES_SAMPLER</code> / <code>OTEL_TRACES_SAMPLER_ARG</code>, default <code>parentbased_always_on</code> when an endpoint is
+set (a cell does tens of requests per second at most). Never traced: <code>/health/*</code>, <code>/metrics</code>, the runners&#39;
+heartbeats (<code>/runner/heartbeat</code>, <code>/runner/jobs/:id/heartbeat</code>); the claim long-poll is traced (it is where a job
+starts). Span attributes never carry a query string (<code>url.path</code> only): the redaction rule applies to spans too.</p>
+<p><strong>Where to search.</strong> The pipeline-level spans — <code>pipeline &lt;name&gt;</code> and the <code>job &lt;kind&gt;</code> spans — are emitted by
+whichever process finishes the work (the API on a runner&#39;s <code>/complete</code>, the worker after a gate), so they carry a
+resource of their own: service <strong><code>matelot-pipeline</code></strong> (attribute <code>matelot.emitted_by</code> names the process). In Jaeger
+or Tempo: service <code>matelot-pipeline</code>, operation <code>pipeline Security pipeline</code>, or tag <code>matelot.pipeline.id=&lt;id&gt;</code>; the
+request spans are under <code>matelot-api</code>, the phases under <code>matelot-runner</code>, the gate under <code>matelot-worker</code>.</p>
+<p><strong>Span budget.</strong> A security pipeline on kind first produced 1 824 spans, most of them Redis commands of the rate
+limiter and BullMQ housekeeping, pool checkouts and sub-millisecond queries. <code>telemetry/trim.ts</code> drops, when a span
+ends: ioredis housekeeping (<code>rl:</code> / <code>bull:</code> keys, <code>multi</code> / <code>exec</code> / <code>pexpire</code> / <code>evalsha</code>) whatever its duration and
+any other Redis command under 5 ms; <code>pg-pool.connect</code> / <code>pg.connect</code> always and <code>pg.query:*</code> under 5 ms — a slow
+query or command stays, and that is what the trace is for. The runner&#39;s log batches (<code>/logs</code>, dozens per job) are
+sent with the trace&#39;s id but the sampled flag off, so the cell records no span for them; each batch is an event
+<code>logs shipped</code> on the job span. The runners&#39; claim long-poll (one request every 20 s per runner, with or without
+work) is never a trace of its own: its request span is dropped by the same rules and the polling loop runs with
+instrumentation suppressed, so an empty poll leaves nothing; a poll that hands out a job leaves one <code>claim</code> span in
+the pipeline&#39;s trace under the job&#39;s span: it starts when the job became claimable (<code>jobs.queued_at</code> — creation for
+the first stage, the stage opening for later ones, a retry or a lost lease afterwards; the job span has a <code>queued</code>
+event there) and ends at the hand-out, so it is the job&#39;s queue wait and never starts before its parent; the runner&#39;s
+own long-poll wait, which may have begun before the job existed, is only the attribute <code>matelot.claim.waited_ms</code>
+(with <code>matelot.claim.polls</code>, runner, pool). <strong>Client polls</strong> are never a trace of their own: the web app marks every
+background refetch (its refresh interval, a window regaining focus, an invalidation when a job finished) and the CLI
+its <code>--wait</code> loops with <code>x-matelot-poll: 1</code> (the CLI also sends a traceparent whose sampled flag is off, for older
+cells); the cell&#39;s sampler (<code>telemetry/sampler.ts</code>) records no root for a GET that carries the header, nor for <code>GET /pipelines/:id</code>, <code>/pipelines/:id/jobs</code>, <code>/jobs/:id</code>, <code>/jobs/:id/logs</code> and the correlation job endpoint from any
+client. Every other parentless GET is recorded for a share of the trace ids — <code>MATELOT_TRACES_GET_RATIO</code>
+(<code>observability.otlp.getRatio</code>, default 0.1): reads are many and alike, one in ten shows the latency profile —
+and mutations (POST, PUT, PATCH, DELETE) always; a request inside a sampled trace follows its parent, poll or not.
+One open tab was ~150 root traces in 10 minutes (jobs/active, audit-events, /me, …) before this. Worker timers are
+root spans named <code>worker &lt;loop&gt;</code> (correlation, registry reconcile, exceptions, digest, remediation reconcile,
+snapshots, risk, usage, image sync, enrichment) under service <code>matelot-worker</code>; the every-few-seconds housekeeping
+(sweeper, gauges, platform heartbeat and the policy_eval queue query) runs with instrumentation suppressed and the
+sweeper emits a <code>worker sweep</code> span (also <code>matelot-worker</code>: only a pipeline&#39;s root and job spans belong to
+<code>matelot-pipeline</code>) only when it changed something; module initialisation of the api and the worker (signing keys,
+caches) runs suppressed too — so every root span is a request, a worker loop or a pipeline (the budget test fails on
+any other). <code>apps/api/test/span-budget.mjs</code> (CI, api job) runs a security pipeline through the
+built api and worker with the real instrumentation and a fake runner, and fails above <strong>150 spans</strong> in the trace,
+on any <code>/logs</code> span, when the root is not <code>pipeline Security pipeline</code> under <code>matelot-pipeline</code>, when any job of the
+template lacks its <code>job &lt;kind&gt;</code>, <code>claim</code>, <code>/start</code> and <code>/complete</code> spans in the pipeline&#39;s trace (or has them in
+another), when empty claim polls or <code>--wait</code> polls add a span, when a simulated web session (ten marked polls of four
+routes) adds a root, when a span starts before or ends after its parent, when a span other than a pipeline&#39;s root or
+job carries service <code>matelot-pipeline</code>, or when any root span is not a request, a <code>worker &lt;loop&gt;</code> or a
+pipeline — today the trace holds 34 spans from the cell plus the runner&#39;s own (about 25 for the real one).</p>
+<h3 id="metrics"><a class="anchor" href="#metrics">Metrics</a></h3>
+<p>The OTel SDK&#39;s meter (<code>apps/api/src/telemetry/metrics.ts</code>) with explicit histogram buckets through Views — three
+shapes of latency: <strong>http</strong> 5 ms–10 s, <strong>pipeline jobs</strong> 1 s–30 min, <strong>correlation / ingestion</strong> 100 ms–5 min — a
+Prometheus / OpenMetrics page on port 9464 <strong>and</strong>, when <code>OTEL_METRICS_EXPORTER</code> includes <code>otlp</code>, a periodic OTLP push
+of the same instruments. The page is rendered by our own serializer (<code>telemetry/exposition.ts</code>), not the SDK&#39;s
+Prometheus exporter, for one reason: <strong>trace exemplars</strong>. The JS SDK collects none yet; ours attaches the last
+sampled measurement per bucket as <code># {trace_id=&quot;…&quot;,span_id=&quot;…&quot;} &lt;value&gt; &lt;ts&gt;</code> to a scraper that accepts OpenMetrics
+(Prometheus with <code>--enable-feature=exemplar-storage</code>; Grafana then jumps from a slow p95 bar to the exact trace).
+Pipeline histograms point at the pipeline&#39;s trace, not at the HTTP request that reported the job. The format is
+pinned by <code>exposition.spec.ts</code>: dots → underscores, the unit as suffix, <code>_total</code> on counters, <code>matelot_build_info</code> =
+1, every label in the allowed set. Names follow the OTel conventions (<code>http.server.request.duration</code> →
+<code>http_server_request_duration_seconds</code>); ours carry the <code>matelot_</code> prefix.</p>
+<p><strong>Every enumerable series exists from the first scrape, at zero</strong> (<code>KNOWN_LABEL_SETS</code> in <code>metrics.ts</code>,
+<code>seedKnownSeries</code>; the runner&#39;s <code>telemetry.ts</code> likewise): job kind × terminal status, pipeline status × trigger, claim
+and gate results, queue × result, the correlation / sync / webhook sets — counters through <code>add(0)</code>, histograms as
+empty buckets rendered by the serializer until observed. A series that first appears at its observed value gives
+<code>rate()</code> and <code>increase()</code> nothing for that first event: the alert on the first failed job and the p95 after the first
+pipeline were both NaN. Both the api and the worker publish the pipeline families (either process can be the one
+that finishes a given job: the runner API, the worker&#39;s policy_eval, a timeout, a cancel), so dashboards sum over
+<code>job</code>. What stays lazy, because its label set is not known at startup: the HTTP histogram (route template × method ×
+status) and the per-pool gauges — their queries use <code>or vector(0)</code> / <code>absent()</code> where a missing series matters.</p>
+<table>
+<thead>
+<tr>
+<th>Metric (Prometheus name)</th>
+<th>Type</th>
+<th>Labels</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>http_server_request_duration_seconds</code></td>
+<td>histogram</td>
+<td><code>http_request_method</code>, <code>http_route</code> (the <strong>route template</strong> <code>/api/v1/projects/:projectId</code>, never the raw path), <code>http_response_status_code</code></td>
+<td>api (interceptor after routing; probes excluded)</td>
+</tr>
+<tr>
+<td><code>db_client_connection_count</code></td>
+<td>gauge</td>
+<td><code>state</code> (used, idle, pending)</td>
+<td>pool stats, every 5 s</td>
+</tr>
+<tr>
+<td><code>db_client_operation_duration_seconds</code></td>
+<td>histogram</td>
+<td><code>db_namespace</code>, <code>error_type</code></td>
+<td>the <code>pg</code> instrumentation (present while tracing is on), http buckets</td>
+</tr>
+<tr>
+<td><code>matelot_queue_jobs</code></td>
+<td>gauge</td>
+<td><code>queue</code> (<code>github-sync</code>, <code>github-webhooks</code>), <code>state</code> (waiting, active, delayed, failed)</td>
+<td>worker, from BullMQ counts every 15 s</td>
+</tr>
+<tr>
+<td><code>matelot_queue_oldest_job_age_seconds</code></td>
+<td>gauge</td>
+<td><code>queue</code></td>
+<td>worker</td>
+</tr>
+<tr>
+<td><code>matelot_queue_jobs_processed_total</code></td>
+<td>counter</td>
+<td><code>queue</code>, <code>result</code></td>
+<td>worker (BullMQ events)</td>
+</tr>
+<tr>
+<td><code>matelot_pipeline_jobs_total</code></td>
+<td>counter</td>
+<td><code>kind</code>, <code>status</code> (succeeded, failed, cancelled, timed_out)</td>
+<td>api, on <code>/complete</code> and the sweeper</td>
+</tr>
+<tr>
+<td><code>matelot_pipeline_job_duration_seconds</code></td>
+<td>histogram</td>
+<td><code>kind</code></td>
+<td>api, from <code>started_at</code> → <code>finished_at</code></td>
+</tr>
+<tr>
+<td><code>matelot_pipeline_job_queue_wait_seconds</code></td>
+<td>histogram</td>
+<td><code>kind</code></td>
+<td>api, <code>queued_at</code> → <code>started_at</code> (queued = claimable: creation for the first stage, the stage opening for later ones)</td>
+</tr>
+<tr>
+<td><code>matelot_pipeline_jobs_queued</code></td>
+<td>gauge</td>
+<td><code>kind</code>, <code>pool</code></td>
+<td>worker, <code>jobs</code> table every 15 s (the DB queue: depth and age below)</td>
+</tr>
+<tr>
+<td><code>matelot_pipeline_oldest_queued_job_age_seconds</code></td>
+<td>gauge</td>
+<td><code>pool</code></td>
+<td>worker</td>
+</tr>
+<tr>
+<td><code>matelot_pipelines_total</code></td>
+<td>counter</td>
+<td><code>status</code>, <code>trigger</code></td>
+<td>api</td>
+</tr>
+<tr>
+<td><code>matelot_runners_online</code></td>
+<td>gauge</td>
+<td><code>pool</code>, <code>managed</code></td>
+<td>worker, from heartbeats (online = heartbeat within 60 s)</td>
+</tr>
+<tr>
+<td><code>matelot_runners_busy</code></td>
+<td>gauge</td>
+<td><code>pool</code></td>
+<td>worker</td>
+</tr>
+<tr>
+<td><code>matelot_runner_last_seen_timestamp_seconds</code></td>
+<td>gauge</td>
+<td><code>pool</code></td>
+<td>worker: unix time of the newest heartbeat per pool, so <code>NoRunnerOnline</code> is <code>time() - … &gt; 600</code>, an expression on the scrape</td>
+</tr>
+<tr>
+<td><code>matelot_runner_claims_total</code></td>
+<td>counter</td>
+<td><code>result</code> (job, empty, disconnected)</td>
+<td>api</td>
+</tr>
+<tr>
+<td><code>matelot_runner_job_duration_seconds</code>, <code>matelot_runner_jobs_total</code>, <code>matelot_runner_busy</code></td>
+<td>histogram / counter / gauge</td>
+<td><code>kind</code>, <code>phase</code> / <code>kind</code>, <code>status</code> / —</td>
+<td>runner (its own <code>/metrics</code>, <code>RUNNER_METRICS_PORT</code>; exemplars on the job histogram)</td>
+</tr>
+<tr>
+<td><code>matelot_sbom_ingest_duration_seconds</code>, <code>matelot_sbom_correlation_duration_seconds</code></td>
+<td>histogram</td>
+<td><code>source</code> (runner, ci_upload, manual / loop)</td>
+<td>api (<code>SbomService.ingest</code>) / worker</td>
+</tr>
+<tr>
+<td><code>matelot_findings_open</code></td>
+<td>gauge</td>
+<td><code>severity</code>, <code>kind</code> (dependency, code)</td>
+<td>worker, refreshed every 10 min with the correlation loop — <strong>per cell, never per project</strong> (cardinality)</td>
+</tr>
+<tr>
+<td><code>matelot_gate_evaluations_total</code></td>
+<td>counter</td>
+<td><code>result</code> (pass, fail, warn)</td>
+<td>api</td>
+</tr>
+<tr>
+<td><code>matelot_sla_breaches</code></td>
+<td>gauge</td>
+<td><code>severity</code></td>
+<td>worker, every 10 min with the findings refresh: open / in-progress remediations past <code>due_at</code></td>
+</tr>
+<tr>
+<td><code>matelot_integration_sync_failures_total</code></td>
+<td>counter</td>
+<td><code>kind</code> (github, gitlab, jira, registry)</td>
+<td>worker</td>
+</tr>
+<tr>
+<td><code>matelot_webhook_lag_seconds</code></td>
+<td>histogram</td>
+<td><code>provider</code></td>
+<td>worker (delivery time → processed)</td>
+</tr>
+<tr>
+<td><code>matelot_backup_last_success_timestamp_seconds</code>, <code>matelot_backup_last_failure_timestamp_seconds</code>, <code>matelot_backup_last_duration_seconds</code></td>
+<td>gauge</td>
+<td>—</td>
+<td>worker, from the backup reports (<code>POST /api/v1/internal/backup-reports</code>, cell-local token) the backup CronJob / Compose <code>backup</code> service send</td>
+</tr>
+<tr>
+<td><code>matelot_license_seats_used</code>, <code>matelot_license_expiry_timestamp_seconds</code></td>
+<td>gauge</td>
+<td>—</td>
+<td>M13 (absent until licensing exists)</td>
+</tr>
+<tr>
+<td><code>matelot_build_info</code></td>
+<td>gauge (1)</td>
+<td><code>version</code>, <code>commit</code>, <code>node_version</code>, <code>component</code></td>
+<td>each process, from <code>/api/v1/version</code> data</td>
+</tr>
+</tbody></table>
+<p>Rules: labels are bounded enumerations (kinds, statuses, pools, severities, route templates) — never ids, names,
+repository paths or user input: <code>ALLOWED_LABELS</code> in <code>metrics.ts</code> is enforced at record time (an instrument with a
+label outside it throws) and on the rendered page by the spec; the runner&#39;s metrics endpoint carries only its own
+job histogram, counters and <code>build_info</code>; anything that needs a SQL query is computed in the worker on a timer
+(<code>WorkerGauges</code>: queues and runners every 15 s, open findings with the 10-minute correlation loop) and exported as a
+gauge whose absent series vanish, never on scrape.</p>
+<p>Postgres and Redis: <code>postgres_exporter</code> and <code>redis_exporter</code> as sidecars of the bundled StatefulSets (off with
+<code>postgres.bundled=false</code> — a managed database brings its own); Keycloak with <code>KC_METRICS_ENABLED=true</code> on its
+management port (<code>/metrics</code>, already not on the ingress); the registry&#39;s debug port (<code>:5001/metrics</code>).</p>
+<h3 id="logs"><a class="anchor" href="#logs">Logs</a></h3>
+<p>pino stays. <code>apps/api/src/telemetry/log-schema.ts</code> (api + worker) and the runner&#39;s <code>JsonLogger</code> write one line shape —
+<code>{&quot;time&quot;,&quot;level&quot;,&quot;component&quot;,&quot;cell&quot;,&quot;msg&quot;,&quot;context&quot;,&quot;trace_id&quot;,&quot;span_id&quot;,&quot;request_id&quot;, …fields}</code> — <code>trace_id</code> /
+<code>span_id</code> from the active span (a pino mixin), <code>request_id</code> from <code>x-request-id</code> as before; the runner&#39;s <code>console.*</code>
+is gone. Log level per module: <code>LOG_LEVEL=info,jobs=debug,integrations.github=trace</code> (the first entry is the
+default, then <code>module=level</code>, matched against Nest&#39;s logger context — <code>JobsService</code> is <code>jobs</code>). One redaction list
+(<code>REDACTED_KEYS</code> in <code>log-schema.ts</code>: <code>authorization</code>, <code>cookie</code>, <code>password</code>, <code>secret</code>, <code>token</code>, <code>privateKey</code>,
+<code>clientSecret</code>, <code>webhookSecret</code>, <code>apiKey</code>, <code>registrationToken</code>, <code>runnerToken</code>, …) applied at any depth to every
+logger; <code>log-schema.spec.ts</code> logs an object carrying every known key, nested three levels, and fails if a value
+survives. OTLP log export (<code>OTEL_LOGS_EXPORTER=otlp</code>) comes with drop 2 for customers whose collector prefers it to
+scraping stdout; the stdout line is the primary.</p>
+<p>Audit events and security events (gate failures, token misuse, sign-in anomalies) are also emitted as OTel log
+records with a <strong>stable</strong> <code>event.name</code> (<code>matelot.audit</code>, <code>matelot.security</code>) and documented attributes, so a SIEM
+ingests them without parsing our audit table (phase 4).</p>
+<h3 id="configuration"><a class="anchor" href="#configuration">Configuration</a></h3>
+<p>Standard OTel variables first, ours only where OTel has none. Every variable exists in both delivery forms
+(<code>api-configmap.yaml</code> and <code>compose-init.sh</code>&#39;s <code>env/api.env</code> — the existing rule) and in <code>apps/api/src/config/env.ts</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Meaning</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>OTEL_EXPORTER_OTLP_ENDPOINT</code>, <code>OTEL_EXPORTER_OTLP_HEADERS</code>, <code>OTEL_EXPORTER_OTLP_PROTOCOL</code></td>
+<td>where traces (and optionally metrics / logs) go; <code>grpc</code> or <code>http/protobuf</code></td>
+<td>unset → nothing is pushed</td>
+</tr>
+<tr>
+<td><code>OTEL_TRACES_SAMPLER</code>, <code>OTEL_TRACES_SAMPLER_ARG</code></td>
+<td>SDK sampler</td>
+<td><code>parentbased_always_on</code></td>
+</tr>
+<tr>
+<td><code>OTEL_METRICS_EXPORTER</code></td>
+<td><code>prometheus</code> (default), <code>otlp</code>, <code>none</code>, comma-separated (<code>prometheus,otlp</code> pushes too)</td>
+<td><code>prometheus</code></td>
+</tr>
+<tr>
+<td><code>OTEL_TRACES_EXPORTER</code></td>
+<td><code>otlp</code> (default), <code>console</code>, <code>file</code> (JSON lines to <code>OTEL_TRACES_FILE</code>; tests), <code>none</code></td>
+<td><code>otlp</code></td>
+</tr>
+<tr>
+<td><code>OTEL_SERVICE_NAME</code>, <code>OTEL_RESOURCE_ATTRIBUTES</code></td>
+<td>override / extend the resource</td>
+<td>set by the chart / compose per component</td>
+</tr>
+<tr>
+<td><code>MATELOT_METRICS_ENABLED</code>, <code>MATELOT_METRICS_PORT</code></td>
+<td>the <code>/metrics</code> listener</td>
+<td><code>true</code>, <code>9464</code> (runner: <code>RUNNER_METRICS_PORT</code>, <code>0</code> = off)</td>
+</tr>
+<tr>
+<td><code>MATELOT_TRACING_ENABLED</code></td>
+<td>the tracer provider (auto <code>true</code> when an endpoint is set; <code>false</code> forces it off)</td>
+<td>derived</td>
+</tr>
+<tr>
+<td><code>DEPLOYMENT_ENVIRONMENT</code></td>
+<td><code>deployment.environment</code></td>
+<td><code>production</code></td>
+</tr>
+<tr>
+<td><code>LOG_LEVEL</code></td>
+<td>default level, then <code>module=level</code> pairs</td>
+<td><code>info</code></td>
+</tr>
+</tbody></table>
+<p><code>/api/v1/health/live</code> and <code>/ready</code> stay as they are. <code>/api/v1/version</code> carries <code>commit</code> and <code>builtAt</code> (<code>APP_COMMIT</code>,
+<code>APP_BUILT_AT</code>, build arguments of the images set by the release workflow), the fields <code>matelot_build_info</code> carries.</p>
+<h2 id="delivery"><a class="anchor" href="#delivery">Delivery</a></h2>
+<p>Drop 1 gave every process its metrics port and its OTLP exporter; drop 2 delivers the signals to a stack — the
+customer&#39;s (Helm: kube-prometheus-stack, Tempo, Loki, or anything that speaks OTLP and scrapes Prometheus) or the one
+the Compose profile brings. Everything below is off by default: a cell installed with the chart&#39;s defaults renders
+no monitoring CRD and runs on a bare kind cluster.</p>
+<h3 id="helm"><a class="anchor" href="#helm">Helm</a></h3>
+<pre><code class="language-yaml">observability:
+  environment: production         # deployment.environment on every signal
+  metrics:
+    enabled: true                 # /metrics on 9464 (api, worker, managed runners) + the scrape NetworkPolicy
+    port: 9464
+    scrapeFromNamespaces: [monitoring, observability]   # the only namespaces admitted to the metrics ports
+    serviceMonitor:
+      enabled: false              # one ServiceMonitor for every metrics Service below (needs the operator&#39;s CRDs)
+      labels: {}                  # e.g. release: kube-prometheus-stack — what the Prometheus&#39;s selector wants
+      interval: 30s
+      scrapeTimeout: 10s
+    exporters:
+      enabled: false              # postgres_exporter / redis_exporter sidecars, Keycloak metrics, registry debug port
+  otlp:
+    endpoint: &quot;&quot;                  # e.g. http://tempo.monitoring:4318 → OTEL_* on every component
+    protocol: http/protobuf       # or grpc
+    headersSecret: &quot;&quot;             # a Secret holding OTEL_EXPORTER_OTLP_HEADERS (Grafana Cloud&#39;s token) — never values
+    headersSecretKey: OTEL_EXPORTER_OTLP_HEADERS
+    tracesSampler: parentbased_always_on
+    tracesSamplerArg: &quot;&quot;
+    metrics: false                # also push metrics over OTLP (OTEL_METRICS_EXPORTER=prometheus,otlp)
+</code></pre>
+<p>What renders:</p>
+<ul>
+<li><strong>Metrics Services.</strong> One headless Service per target, <code>&lt;release&gt;-&lt;name&gt;-metrics</code>, port named <code>metrics</code>, labels
+<code>matelot.cloud/metrics: &quot;true&quot;</code> and <code>matelot.cloud/job: matelot-&lt;name&gt;</code>: api, worker, runner (managed runners),
+and with <code>exporters.enabled</code> postgres (9187) and redis (9121) when bundled, keycloak (9000, the management port)
+when bundled, registry (5001) when the built-in registry is on. They exist with or without the operator — any
+Prometheus can discover them by label.</li>
+<li><strong>ServiceMonitor</strong> <code>&lt;release&gt;</code> (<code>serviceMonitor.enabled</code>): selects exactly those Services in the release&#39;s
+namespace, <code>jobLabel: matelot.cloud/job</code> (so the job is <code>matelot-api</code>, <code>matelot-postgres</code>, …), one endpoint on port
+<code>metrics</code>, and a relabel adding <code>cell=&lt;slug&gt;</code>. Rendering it with <code>metrics.enabled=false</code> fails with a message.</li>
+<li><strong>Exporters</strong> (<code>exporters.enabled</code>): <code>postgres_exporter</code> v0.20.0 as a sidecar of the bundled Postgres
+(<code>localhost:5432</code>, credentials from the <code>&lt;release&gt;-postgres</code> Secret), <code>redis_exporter</code> v1.94.0 as a sidecar of the
+bundled Redis — neither with <code>bundled: false</code> (point your own exporter at the managed service); Keycloak gets
+<code>KC_METRICS_ENABLED=true</code> (<code>/metrics</code> on the management port 9000, which never reaches the ingress); the registry
+gets its <code>http.debug</code> listener on 5001 with Prometheus metrics. All of them run as non-root with a read-only root.</li>
+<li><strong>NetworkPolicy</strong> <code>&lt;release&gt;-allow-metrics-scrape</code>: ingress to 9464 (+ 9187, 9121, 9000, 5001 with the exporters)
+only from <code>scrapeFromNamespaces</code>. No metrics Service is referenced by the ingress (<code>chart-test</code> asserts it).</li>
+<li><strong>OTLP headers</strong> come only from a Secret: <code>observability.otlp.headersSecret</code> names it, every component gets
+<code>OTEL_EXPORTER_OTLP_HEADERS</code> through a <code>secretKeyRef</code>. The old <code>observability.otlp.headers</code> map is refused at
+render time (&quot;tokens do not belong in values&quot;).</li>
+<li><strong>Backups</strong> report themselves: the backup CronJob POSTs its outcome to the API (<code>/api/v1/internal/backup-reports</code>,
+a generated bearer <code>BACKUP_REPORT_TOKEN</code> in <code>&lt;release&gt;-api-secrets</code>, also on S3 uploads), and the worker publishes
+<code>matelot_backup_last_success_timestamp_seconds</code>, <code>matelot_backup_last_failure_timestamp_seconds</code> and
+<code>matelot_backup_last_duration_seconds</code> — the same gauges on Compose, where no kube-state-metrics exists.</li>
+</ul>
+<p><code>chart-test</code> renders defaults, OTLP on, metrics off, everything on and everything on with external Postgres / Redis,
+and asserts among others: no <code>monitoring.coreos.com</code> resource with defaults; every ServiceMonitor endpoint port
+exists on a Service whose selector matches a pod exposing that port; the job list per configuration; exporter args
+and env; the NetworkPolicy ports; the backup report env for PVC and S3. CI&#39;s kind step installs the
+prometheus-operator CRDs only (v0.94.1, the version kube-prometheus-stack 92.11.0 ships) and runs the server-side dry
+run of the everything-on render, fresh and over an existing release.</p>
+<h3 id="kube-prometheus-stack-recipe"><a class="anchor" href="#kube-prometheus-stack-recipe">kube-prometheus-stack recipe</a></h3>
+<p>The values the drop was validated with are in <code>deploy/observability/kind/</code> (published as <code>examples/observability/</code> in
+the helm-charts repository) — <code>make kind-observability TENANT=&lt;slug&gt;</code>
+installs them and switches the cell on (or <code>scripts/kind-observability.sh &lt;slug&gt; --print</code> for the bare commands):</p>
+<pre><code class="language-sh">helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo add grafana https://grafana.github.io/helm-charts
+helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack --version 92.11.0 \
+  -n monitoring --create-namespace -f deploy/observability/kind/kube-prometheus-stack.values.yaml --wait
+helm upgrade --install tempo grafana/tempo --version 1.24.4 -n monitoring -f deploy/observability/kind/tempo.values.yaml --wait
+helm upgrade --install loki  grafana/loki  --version 7.3.0  -n monitoring -f deploy/observability/kind/loki.values.yaml --wait
+helm upgrade --install alloy grafana/alloy --version 1.14.1 -n monitoring -f deploy/observability/kind/alloy.values.yaml --wait
+</code></pre>
+<p>and in the cell&#39;s values file (<code>deploy/cells/&lt;slug&gt;.values.yaml</code>, then <code>cell-provision.sh apply --slug &lt;slug&gt;</code>):</p>
+<pre><code class="language-yaml">observability:
+  metrics:
+    serviceMonitor:
+      enabled: true
+      labels: { release: kube-prometheus-stack }   # = the kube-prometheus-stack release name
+    exporters:
+      enabled: true
+  otlp:
+    endpoint: &quot;http://tempo.monitoring:4318&quot;
+    protocol: http/protobuf
+</code></pre>
+<p>What matters in the stack&#39;s values: <code>prometheus.prometheusSpec.enableFeatures: [exemplar-storage]</code> (the trace links
+on the histograms) and <code>serviceMonitorNamespaceSelector: {}</code> (cells live in <code>tenant-&lt;slug&gt;</code>); Grafana&#39;s
+<code>sidecar.datasources.exemplarTraceIdDestinations</code> (<code>trace_id</code> → Tempo) and the Tempo / Loki datasources with
+trace → logs by <code>trace_id</code>; Alloy turning our JSON log lines&#39; <code>trace_id</code> / <code>span_id</code> into Loki structured metadata.
+On a <strong>real cluster</strong> keep all of that and change: Grafana&#39;s admin password from a Secret
+(<code>grafana.admin.existingSecret</code>), persistence and retention sized for the cluster (Prometheus
+<code>storageSpec</code>, Loki / Tempo on object storage — <code>loki.storage.type: s3</code>, <code>deploymentMode: SimpleScalable</code>, Tempo
+<code>storage.trace.backend: s3</code>), Alertmanager on, Alloy as a DaemonSet with <code>loki.source.file</code> over <code>/var/log/pods</code> if
+the API-based tailing is too much load, and Grafana&#39;s ingress behind your SSO.</p>
+<h3 id="docker-compose"><a class="anchor" href="#docker-compose">Docker Compose</a></h3>
+<p><code>COMPOSE_PROFILES=observability</code> in <code>.env</code> (or <code>docker compose --profile observability up -d</code>) adds:</p>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Image</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>otel-collector</code></td>
+<td>otel/opentelemetry-collector-contrib 0.163.1</td>
+<td>OTLP in (the cell&#39;s <code>MATELOT_OTLP_ENDPOINT</code> defaults to <code>http://otel-collector:4318</code> with the profile), <code>matelot.cell</code> resource attribute, traces → Tempo</td>
+</tr>
+<tr>
+<td><code>prometheus</code></td>
+<td>prom/prometheus v3.15.0</td>
+<td>scrapes api, worker, runner (9464), the exporters, Keycloak (9000), the registry (5001) and the stack itself; exemplar storage on; 7 days</td>
+</tr>
+<tr>
+<td><code>tempo</code></td>
+<td>grafana/tempo 2.9.0</td>
+<td>single binary, local storage, 7 days</td>
+</tr>
+<tr>
+<td><code>loki</code></td>
+<td>grafana/loki 3.6.12</td>
+<td>single binary, TSDB v13 on the filesystem, structured metadata, 7 days</td>
+</tr>
+<tr>
+<td><code>alloy</code></td>
+<td>grafana/alloy v1.21.0</td>
+<td>the logs of this compose project&#39;s containers (Docker socket, read-only) → Loki; <code>trace_id</code> / <code>span_id</code> as structured metadata, <code>level</code> / <code>component</code> / <code>cell</code> / <code>compose_service</code> labels</td>
+</tr>
+<tr>
+<td><code>grafana</code></td>
+<td>grafana/grafana 12.4.12</td>
+<td>at <code>&lt;domain&gt;/grafana/</code> through Caddy; datasources provisioned (Prometheus exemplars → Tempo, Tempo → Loki by <code>trace_id</code>, Loki <code>trace_id</code> → Tempo)</td>
+</tr>
+<tr>
+<td><code>postgres-exporter</code>, <code>redis-exporter</code></td>
+<td>as on Helm</td>
+<td>the bundled database and cache</td>
+</tr>
+</tbody></table>
+<p><code>init</code> renders their configuration into the config volume (the cell&#39;s slug substituted), turns on Keycloak&#39;s metrics
+and the registry&#39;s debug listener, and generates Grafana&#39;s secrets like every other one. Grafana signs users in with
+the cell&#39;s Keycloak (client <code>grafana</code>, confidential; <code>realm-sync</code> creates it in a realm that predates the profile);
+they arrive as Viewers. The local <code>admin</code> account is for the operator: <code>docker compose run --rm init show</code> prints its
+password. No service of the profile publishes a port — Prometheus, Tempo and Loki are reachable only on the compose
+network and through Grafana. Alloy needs <code>/var/run/docker.sock</code> (read-only); that is a privileged handle on the host,
+which is what container log collection costs — leave the profile off where that is not acceptable and send OTLP to
+your own collector instead.</p>
+<p><code>smoke.sh --observability</code> (a second CI pass) brings the cell up with the profile and, through Caddy and Grafana&#39;s
+datasource proxy only: the datasources and the Keycloak sign-in redirect; every Prometheus target <code>up</code>;
+<code>matelot_build_info</code> from api / worker / runner; one series from each exporter; a <code>checkout</code> pipeline on a public
+repository whose trace is in Tempo with <code>matelot-pipeline</code> and <code>matelot-runner</code> spans and whose log lines are in Loki
+by <code>trace_id</code>; a backup run producing <code>matelot_backup_last_success_timestamp_seconds</code>.</p>
+<h3 id="for-customers-who-run-their-own-collector"><a class="anchor" href="#for-customers-who-run-their-own-collector">For customers who run their own collector</a></h3>
+<p>Point the cell at the collector (<code>observability.otlp.endpoint</code>, or <code>MATELOT_OTLP_ENDPOINT</code> on Compose) and let the
+collector scrape the metrics Services. The configuration we recommend:</p>
+<pre><code class="language-yaml">receivers:
+  otlp:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4317 }
+      http: { endpoint: 0.0.0.0:4318 }
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: matelot
+          scrape_interval: 30s
+          kubernetes_sd_configs: [{ role: endpoints }]
+          relabel_configs:   # the cell&#39;s metrics Services only, job = matelot-&lt;name&gt;, cell = the namespace&#39;s slug
+            - { source_labels: [__meta_kubernetes_service_label_matelot_cloud_metrics], regex: &quot;true&quot;, action: keep }
+            - { source_labels: [__meta_kubernetes_endpoint_port_name], regex: metrics, action: keep }
+            - { source_labels: [__meta_kubernetes_service_label_matelot_cloud_job], target_label: job }
+            - { source_labels: [__meta_kubernetes_namespace], regex: &quot;tenant-(.+)&quot;, target_label: cell }
+processors:
+  memory_limiter: { check_interval: 1s, limit_percentage: 80, spike_limit_percentage: 20 }
+  k8sattributes:
+    extract: { metadata: [k8s.namespace.name, k8s.pod.name, k8s.deployment.name, k8s.statefulset.name] }
+  batch: {}
+exporters:
+  prometheusremotewrite: { endpoint: https://prometheus.example.com/api/v1/write }
+  otlp/tempo: { endpoint: tempo.monitoring:4317, tls: { insecure: true } }
+  otlphttp/loki: { endpoint: http://loki.monitoring:3100/otlp }
+service:
+  pipelines:
+    traces:  { receivers: [otlp], processors: [memory_limiter, k8sattributes, batch], exporters: [otlp/tempo] }
+    metrics: { receivers: [prometheus, otlp], processors: [memory_limiter, k8sattributes, batch], exporters: [prometheusremotewrite] }
+</code></pre>
+<p>The collector&#39;s namespace must be in <code>observability.metrics.scrapeFromNamespaces</code>. Keep exemplars: the
+<code>prometheusremotewrite</code> exporter forwards them when the receiving Prometheus has <code>exemplar-storage</code> on. Logs stay on
+stdout as JSON (one schema, <code>trace_id</code> / <code>span_id</code> included) for whatever ships pod logs — Alloy, Fluent Bit, the
+collector&#39;s <code>filelog</code> receiver; promote <code>trace_id</code> to structured metadata (Loki) or a field (Elastic), never to an
+index label. Grafana Cloud: one OTLP endpoint with basic auth — put <code>Authorization=Basic &lt;base64 instance:token&gt;</code> in a
+Secret under the key <code>OTEL_EXPORTER_OTLP_HEADERS</code> and name it in <code>observability.otlp.headersSecret</code>.</p>
+<h2 id="dashboards-and-alerts"><a class="anchor" href="#dashboards-and-alerts">Dashboards and alerts</a></h2>
+<p>Four dashboards and one rules file, shipped twice from one source: <code>deploy/observability/dashboards/*.json</code> and
+<code>deploy/observability/rules/*.yaml</code>, copied into the chart (<code>files/observability</code>) and the Compose profile
+(<code>init/observability</code>) by <code>python3 tools/dashboards/build.py</code> (<code>make dashboards</code>) — <code>chart-test</code> fails when a copy
+differs. The dashboards are <strong>generated</strong>: edit <code>tools/dashboards/build.py</code>, never the JSON. <code>tools/dashboards/test.py</code>
+(CI, chart job) regenerates and compares, parses every panel query and rule expression with <code>promtool</code>, and checks
+that every metric a query names is one a process emits — ours from the instrument declarations in
+<code>telemetry/metrics.ts</code> and the runner&#39;s <code>telemetry.ts</code>, the exporters&#39; and Kubernetes&#39; from its allowlist — so a
+dashboard cannot plot a metric nobody publishes. The rules&#39; unit tests (<code>rules/matelot_test.yaml</code>, <code>promtool test rules</code>) run there too.</p>
+<p>Every query is scoped to the <strong><code>cell</code></strong> variable (<code>label_values(matelot_build_info, cell)</code>): on Helm the ServiceMonitor&#39;s
+relabel adds <code>cell=&lt;slug&gt;</code> to every series; on Compose the scrape jobs carry it as a target label (an external label
+would not reach the rules or the variable). The datasources are inputs (<code>${DS_PROMETHEUS}</code>, <code>${DS_TEMPO}</code>) in the
+source JSON, so it imports into any Grafana; the chart resolves them to the uids of
+<code>observability.grafana.dashboards.datasources</code> (kube-prometheus-stack&#39;s <code>prometheus</code>, our <code>tempo</code>) and compose-init to
+its provisioned datasources, because provisioning does not resolve inputs.</p>
+<table>
+<thead>
+<tr>
+<th>Dashboard (uid)</th>
+<th>Rows</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Cell overview</strong> (<code>matelot-cell-overview</code>)</td>
+<td>Components (api, worker, Keycloak, Postgres, Redis, registry up; runners online; version) · Traffic RED (requests/s by route, 5xx ratio, p50/p95/p99) · Queues and runners (pipeline jobs queued by kind, oldest queued job by pool, runners online/busy, BullMQ by queue and state) · Pipelines (per hour by status, success rate, jobs finished) · Database and cache (pool connections per process, query p95, Postgres transactions and size, Redis commands and memory) · Backups, storage and certificates (backup age, duration, last failure; PVC usage and certificate expiry from the cluster — empty on Compose)</td>
+</tr>
+<tr>
+<td><strong>Pipelines</strong> (<code>matelot-pipelines</code>, variable <code>kind</code>)</td>
+<td>Jobs (duration p95/p50 by kind with exemplars, finished per hour by status, failures by kind, queue wait p95, the runners&#39; own duration) · Runners (utilisation, claims/s by result, online by pool) · Pipelines (duration p95 by status, per hour by trigger, a 24 h table by kind). The traces: the exemplar dots open the job&#39;s trace in Tempo; a text panel gives the TraceQL for the failed pipelines</td>
+</tr>
+<tr>
+<td><strong>Security posture</strong> (<code>matelot-security-posture</code>)</td>
+<td>Findings (open by severity and kind, critical/high stats, SLA breaches, total) · Gates and SLAs (evaluations per hour by result, fail ratio, breaches by severity) · SBOMs (ingested per hour by source, ingest p95, correlation run p95)</td>
+</tr>
+<tr>
+<td><strong>Integrations</strong> (<code>matelot-integrations</code>)</td>
+<td>Source and issue trackers (sync failures by kind, worker queue jobs by result, webhook lag p95, failed BullMQ jobs) · Built-in registry (requests/s by handler and method = pulls and pushes, 4xx/5xx, p95) · Keycloak (active requests, JVM heap, Agroal pool)</td>
+</tr>
+</tbody></table>
+<p>Two gauges that existed as instruments but were never set now are: <code>matelot_sla_breaches{severity}</code> (open or
+in-progress remediations past their due date, with the findings refresh every 10 minutes) and
+<code>matelot_sbom_ingest_duration_seconds{source}</code> (around <code>SbomService.ingest</code>; source = runner, ci_upload, manual).
+&quot;SBOM coverage&quot; as a per-service ratio is the product&#39;s own Coverage page, not a cell metric (it would be per
+service: cardinality); the dashboard shows ingests per hour by source. Where the design said &quot;a link from a pipeline
+row to its trace&quot;, the metrics carry no pipeline ids (labels are bounded sets), so the link is the exemplar on the
+duration histograms plus the TraceQL panel.</p>
+<p><strong>Helm:</strong> <code>observability.prometheusRules.enabled</code> renders the PrometheusRule <code>&lt;release&gt;</code> (labels from
+<code>prometheusRules.labels</code>, e.g. <code>release: kube-prometheus-stack</code>; <code>prometheusRules.kubernetes: false</code> leaves out the
+group that needs kube-state-metrics / kubelet / cert-manager; <code>runbookBaseUrl</code> rewrites every <code>runbook_url</code>);
+<code>observability.grafana.dashboards.enabled</code> renders one ConfigMap per dashboard with <code>grafana_dashboard: &quot;1&quot;</code> and the
+<code>grafana_folder: Matelot</code> annotation for the sidecar (<code>deploy/observability/kind/kube-prometheus-stack.values.yaml</code>
+sets <code>sidecar.dashboards.folderAnnotation</code> and <code>ruleNamespaceSelector: {}</code>). Both need <code>metrics.enabled</code> and the
+operator&#39;s CRDs; <code>make kind-observability</code> switches them on with the rest. <strong>Compose:</strong> the profile&#39;s Prometheus loads
+<code>rules/matelot.yaml</code> (its <code>/alerts</code> page shows them; Grafana&#39;s alert list too) and Grafana provisions the four
+dashboards into folder <em>Matelot</em>; <code>smoke.sh --observability</code> asserts the dashboards, the rules and that the inputs
+resolved. Screenshots of the dashboards are not in this repository: they come from the kind acceptance run.</p>
+<h3 id="alerts"><a class="anchor" href="#alerts">Alerts</a></h3>
+<p><code>deploy/observability/rules/matelot.yaml</code> (every stack) and <code>matelot-kubernetes.yaml</code> (Kubernetes metrics). Each
+alert links here (<code>runbook_url</code>, <code>#alert-&lt;name&gt;</code>); severities: <em>critical</em> = users or data are affected now, <em>warning</em>
+= they will be. Prometheus evaluates them; routing to a pager is the customer&#39;s Alertmanager.</p>
+<table>
+<thead>
+<tr>
+<th>Alert</th>
+<th>Condition</th>
+<th>Severity</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>MatelotApiDown</code></td>
+<td><code>up{job=&quot;matelot-api&quot;} == 0</code> for 2 m</td>
+<td>critical</td>
+</tr>
+<tr>
+<td><code>MatelotApiAbsent</code></td>
+<td>no <code>matelot-api</code> target at all for 5 m</td>
+<td>critical</td>
+</tr>
+<tr>
+<td><code>MatelotWorkerDown</code></td>
+<td><code>up{job=&quot;matelot-worker&quot;} == 0</code> for 5 m</td>
+<td>critical</td>
+</tr>
+<tr>
+<td><code>MatelotKeycloakDown</code></td>
+<td><code>up{job=&quot;matelot-keycloak&quot;} == 0</code> for 2 m</td>
+<td>critical</td>
+</tr>
+<tr>
+<td><code>MatelotNoRunnerOnline</code></td>
+<td>runners online = 0 (or none ever reported) while <code>matelot_pipeline_jobs_queued &gt; 0</code>, for 10 m</td>
+<td>warning</td>
+</tr>
+<tr>
+<td><code>MatelotQueueBacklog</code></td>
+<td>oldest queued pipeline job or BullMQ job older than 600 s, for 10 m</td>
+<td>warning</td>
+</tr>
+<tr>
+<td><code>MatelotPipelineFailureRate</code></td>
+<td>failed / total pipelines over 1 h &gt; 50 % with ≥ 5 pipelines, for 15 m</td>
+<td>warning</td>
+</tr>
+<tr>
+<td><code>MatelotDbConnectionsHigh</code></td>
+<td>a process has &gt; 8 of its 10 pool connections in use, or callers waiting, for 10 m</td>
+<td>warning</td>
+</tr>
+<tr>
+<td><code>MatelotBackupFailed</code></td>
+<td>the last backup report is a failure newer than the last success, for 5 m</td>
+<td>critical</td>
+</tr>
+<tr>
+<td><code>MatelotBackupTooOld</code></td>
+<td>last success older than 36 h, for 1 h</td>
+<td>warning</td>
+</tr>
+<tr>
+<td><code>MatelotLicenseExpiring</code></td>
+<td><code>matelot_license_expiry_timestamp_seconds - time() &lt; 14 d</code> (absent until M13)</td>
+<td>warning</td>
+</tr>
+<tr>
+<td><code>MatelotBackupJobFailed</code> (k8s)</td>
+<td><code>kube_job_status_failed</code> of a <code>*-backup-*</code> Job in a <code>tenant-*</code> namespace</td>
+<td>critical</td>
+</tr>
+<tr>
+<td><code>MatelotCertificateExpiring</code> (k8s)</td>
+<td><code>certmanager_certificate_expiration_timestamp_seconds - time() &lt; 14 d</code></td>
+<td>warning</td>
+</tr>
+<tr>
+<td><code>MatelotDiskAlmostFull</code> (k8s)</td>
+<td>a <code>tenant-*</code> PVC under 10 % free (kubelet volume stats), for 15 m</td>
+<td>critical</td>
+</tr>
+</tbody></table>
+<p>Runbooks:</p>
+<h4 id="alert-matelotapidown"><a class="anchor" href="#alert-matelotapidown">Alert: MatelotApiDown</a></h4>
+<p>The api pod answers no scrape. <code>kubectl -n tenant-&lt;slug&gt; get pods</code> / <code>docker compose ps</code>: a crash loop shows in the
+restart count; <code>kubectl logs deploy/&lt;slug&gt;-api --previous</code> has the reason — most often the database unreachable at
+start (<code>DATABASE_URL</code>, Postgres down: see Postgres on the Cell overview) or a failed migration (the init container&#39;s
+log). <code>/api/v1/health/ready</code> through the ingress says whether users are affected; if only the metrics port is
+unreachable the NetworkPolicy or the ServiceMonitor changed (<code>scrapeFromNamespaces</code>).</p>
+<h4 id="alert-matelotapiabsent"><a class="anchor" href="#alert-matelotapiabsent">Alert: MatelotApiAbsent</a></h4>
+<p>Prometheus has no target: the metrics Service is gone (<code>kubectl -n tenant-&lt;slug&gt; get svc &lt;slug&gt;-api-metrics</code>), the
+ServiceMonitor is not selected (its labels must match the Prometheus&#39;s <code>serviceMonitorSelector</code> — the <code>release</code> label
+of kube-prometheus-stack), or <code>observability.metrics.enabled</code> was turned off while this rule stayed loaded.</p>
+<h4 id="alert-matelotworkerdown"><a class="anchor" href="#alert-matelotworkerdown">Alert: MatelotWorkerDown</a></h4>
+<p>Background work stopped: source sync, webhooks, correlation, the policy_eval stage of pipelines, the sweeper. Same
+diagnosis as the api (<code>deploy/&lt;slug&gt;-worker</code>); the worker also needs Redis (<code>REDIS_URL</code>) — a Redis down shows as
+<code>redis_up 0</code> on the overview. Pipelines whose next stage is <em>evaluate</em> stay queued until it is back.</p>
+<h4 id="alert-matelotkeycloakdown"><a class="anchor" href="#alert-matelotkeycloakdown">Alert: MatelotKeycloakDown</a></h4>
+<p>Nobody can sign in. <code>kubectl -n tenant-&lt;slug&gt; logs deploy/&lt;slug&gt;-keycloak</code>: its database (the <code>keycloak</code> database on
+the same Postgres), the hostname settings after a domain change (<code>KC_HOSTNAME</code>), or memory. Existing tokens keep
+working until they expire; the API itself is up.</p>
+<h4 id="alert-matelotnorunneronline"><a class="anchor" href="#alert-matelotnorunneronline">Alert: MatelotNoRunnerOnline</a></h4>
+<p>Jobs wait and no runner has sent a heartbeat for a minute. Managed runners: <code>kubectl -n tenant-&lt;slug&gt; get sts &lt;slug&gt;-runner</code> (scaled to 0? crash loop? the registration secret rotated?). Customer runners: their host, their
+network path to the API, their token. <code>matelot runners list</code> and <code>matelot doctor</code> show the same from the CLI. The
+queued jobs run as soon as a runner with the required tags comes back; nothing is lost.</p>
+<h4 id="alert-matelotqueuebacklog"><a class="anchor" href="#alert-matelotqueuebacklog">Alert: MatelotQueueBacklog</a></h4>
+<p>The oldest queued job has waited more than 10 minutes. Pipeline jobs: not enough runners for the load, or jobs whose
+<code>requiredTags</code> / requested pool no runner serves (<code>matelot job show &lt;id&gt;</code>); the Pipelines dashboard&#39;s <em>Queue wait</em> and
+<em>Runners online by pool</em> tell which. BullMQ jobs (source sync, webhooks): the worker is down or saturated — the
+Integrations dashboard&#39;s <em>Worker queue jobs</em> and <em>Failed BullMQ jobs</em>.</p>
+<h4 id="alert-matelotpipelinefailurerate"><a class="anchor" href="#alert-matelotpipelinefailurerate">Alert: MatelotPipelineFailureRate</a></h4>
+<p>More than half the pipelines of the last hour failed, at least five of them. Look at the Pipelines dashboard&#39;s
+<em>Failures per hour by kind</em>: one kind failing everywhere is a scanner image or a repository the runners cannot
+reach (the job log: <code>matelot job logs &lt;id&gt;</code>); every kind failing is the runner&#39;s environment (disk, network, a
+broken image pull). A gate (<code>policy_eval</code>) failing every run is a policy, not an outage — the Security posture
+dashboard&#39;s gate panels.</p>
+<h4 id="alert-matelotdbconnectionshigh"><a class="anchor" href="#alert-matelotdbconnectionshigh">Alert: MatelotDbConnectionsHigh</a></h4>
+<p>A process holds more than 8 of its 10 pool connections, or requests wait for one. A slow query is the usual cause:
+<code>pg_stat_activity</code> on the cell&#39;s Postgres (<code>kubectl exec … psql</code>), or the <em>Query latency p95</em> panel; a sustained load
+needs more api replicas (<code>api.replicas</code>) rather than a bigger pool.</p>
+<h4 id="alert-matelotbackupfailed"><a class="anchor" href="#alert-matelotbackupfailed">Alert: MatelotBackupFailed</a></h4>
+<p>The last backup run reported a failure. The reason is in the report (<code>backup_reports</code> table through
+<code>GET /api/v1/internal/backup-reports</code> is not exposed; the API&#39;s audit trail has <code>backup.failed</code> with the error) and
+in the Job&#39;s log (<code>kubectl -n tenant-&lt;slug&gt; logs job/&lt;name&gt;</code>; Compose: <code>docker compose --profile backup run --rm backup</code>). Typical: Postgres unreachable (the run waits two minutes for it), the backups PVC full
+(<code>MatelotDiskAlmostFull</code>), S3 credentials. Run one by hand: <code>make backup TENANT=&lt;slug&gt;</code>.</p>
+<h4 id="alert-matelotbackuptooold"><a class="anchor" href="#alert-matelotbackuptooold">Alert: MatelotBackupTooOld</a></h4>
+<p>No successful backup for 36 hours. The CronJob is suspended or its schedule changed (<code>kubectl -n tenant-&lt;slug&gt; get cronjob</code>), every run fails (see above), or backups were disabled (<code>backup.enabled</code>) while the rules stayed loaded —
+then turn the rules off or the backups on.</p>
+<h4 id="alert-matelotlicenseexpiring"><a class="anchor" href="#alert-matelotlicenseexpiring">Alert: MatelotLicenseExpiring</a></h4>
+<p>The licence expires within 14 days (M13 licensing; the metric does not exist before). Renew the key in Settings →
+License; the cell falls back to the Free tier otherwise.</p>
+<h4 id="alert-matelotbackupjobfailed"><a class="anchor" href="#alert-matelotbackupjobfailed">Alert: MatelotBackupJobFailed</a></h4>
+<p>Kubernetes saw a backup Job pod fail (kube-state-metrics). Same as <code>MatelotBackupFailed</code>, from the cluster&#39;s side:
+<code>kubectl -n &lt;namespace&gt; get jobs</code> and the failed pod&#39;s log.</p>
+<h4 id="alert-matelotcertificateexpiring"><a class="anchor" href="#alert-matelotcertificateexpiring">Alert: MatelotCertificateExpiring</a></h4>
+<p>cert-manager has not renewed a cell certificate due within 14 days: <code>kubectl -n &lt;namespace&gt; describe certificate</code>
+and the issuer&#39;s challenge (DNS of <code>&lt;slug&gt;.&lt;domain&gt;</code>, <code>auth-&lt;slug&gt;.&lt;domain&gt;</code>, <code>registry-&lt;slug&gt;.&lt;domain&gt;</code> pointing at
+the ingress; rate limits). Users see browser warnings when it expires.</p>
+<h4 id="alert-matelotdiskalmostfull"><a class="anchor" href="#alert-matelotdiskalmostfull">Alert: MatelotDiskAlmostFull</a></h4>
+<p>A cell volume has under 10 % free: Postgres (<code>&lt;slug&gt;-postgres</code>), the registry, or the backups PVC. Grow the PVC if the
+storage class allows expansion; otherwise prune — backup retention (<code>backup.retentionDays</code>), registry garbage
+collection, or the database&#39;s own growth (SBOM documents are the bulk). Postgres stopping on a full disk takes the
+cell down.</p>
+<h2 id="product-facing-phase-4"><a class="anchor" href="#product-facing-phase-4">Product-facing (phase 4)</a></h2>
+<ul>
+<li><strong>Settings → Observability</strong> (cell administrators, under Administration): what is enabled (metrics, tracing, log
+export), the configured endpoints (headers masked), the last scrape time per component (each process records the
+time of its last <code>/metrics</code> request), a <strong>Test OTLP</strong> button (the API sends one span and reports the exporter&#39;s
+result), and the Grafana link when <code>observability.grafana.url</code> is set.</li>
+<li><code>matelot doctor</code> gains an <em>observability</em> section: metrics endpoint reachable (through the API, since 9464 is
+not public), OTLP configured, last trace seen, last scrape.</li>
+<li>Audit and security events as OTel logs (schema above), documented field by field.</li>
+<li>Public docs: this page, rewritten for customers (recipes, dashboard gallery, alert list with runbooks, collector
+config).</li>
+</ul>
+<h2 id="security"><a class="anchor" href="#security">Security</a></h2>
+<ul>
+<li>Metrics ports are never on the ingress; the NetworkPolicy limits them to the monitoring namespace(s); the Compose
+stack publishes none of them on the host — Prometheus scrapes on the compose network and Grafana is behind Caddy<ul>
+<li>Keycloak.</li>
+</ul>
+</li>
+<li>No label or span attribute carries a secret, a token, a repository URL with credentials, or user input; route
+templates, not paths; the redaction list applies to logs <em>and</em> to span attributes (<code>http.url</code> is recorded without
+query string).</li>
+<li>OTLP headers (Grafana Cloud tokens) live in a Secret the operator creates (<code>observability.otlp.headersSecret</code>),
+referenced by every pod through a <code>secretKeyRef</code>; the chart refuses headers in values.</li>
+<li>The backup report endpoint is unauthenticated for users and accepts only the generated <code>BACKUP_REPORT_TOKEN</code>
+(compared in constant time); it is not in the OpenAPI document.</li>
+<li>Business gauges are per cell (the customer&#39;s own cell): no cross-tenant data exists in a cell.</li>
+</ul>
+<h2 id="plan-four-drops"><a class="anchor" href="#plan-four-drops">Plan — four drops</a></h2>
+<table>
+<thead>
+<tr>
+<th>Drop</th>
+<th>Content</th>
+<th>Acceptance</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1 — instrumentation ✅</td>
+<td><code>tracing.ts</code> preload + SDK in api / worker; runner spans and <code>traceParent</code> in the claim protocol (<code>pipelines.trace_parent</code>, <code>jobs.trace_parent</code>, migration 0049); meter with Views + our exposition on 9464 (exemplars); log schema, per-module levels, redaction list + test; env in <code>env.ts</code>, <code>api-configmap.yaml</code>, <code>compose-init</code>; <code>/version</code> with commit; <code>make kind-jaeger</code></td>
+<td><code>exposition.spec.ts</code> (format, buckets, exemplars, labels), <code>log-schema.spec.ts</code> (redaction, levels, trace ids), <code>tracing.spec.ts</code> (no-op when off, provider when on), <code>pipeline-trace.spec.ts</code> (create → claim → complete: one trace, pinned ids, parents, exemplars, BullMQ propagation), runner <code>telemetry.test.ts</code>; verified against a real Jaeger 2.22: a security pipeline (checkout, syft, trivy, semgrep, gate) is one trace across api, runner and worker</td>
+</tr>
+<tr>
+<td>2 — delivery</td>
+<td><code>observability.*</code> values, metrics Services + one ServiceMonitor, NetworkPolicy, exporter sidecars, Keycloak metrics, registry debug port, OTLP headers from a Secret only, backup reports → backup gauges; chart-test on / off; CI kind with the operator CRDs; Compose profile with collector, Prometheus, Tempo, Loki, Grafana (Keycloak sign-in), Alloy; <code>smoke.sh --observability</code>; the collector config and the kube-prometheus-stack recipe above; <code>make kind-observability</code></td>
+<td>chart-test and CI green; Compose smoke with the profile green (targets up, trace in Tempo, logs in Loki); on kind with the recipe: <code>apply</code> passes, every matelot target UP, <code>matelot_build_info</code> for api / worker / runner, the exporters&#39; series, a demo-app pipeline trace in Tempo with its logs in Loki</td>
+</tr>
+<tr>
+<td>3 — dashboards and alerts</td>
+<td>the four dashboards generated by <code>tools/dashboards/build.py</code>, the rules files with promtool unit tests, <code>tools/dashboards/test.py</code> in CI (regeneration, expression parsing, every metric published), PrometheusRule + dashboards ConfigMaps in the chart, Grafana provisioning + <code>rule_files</code> in Compose, <code>smoke.sh --observability</code> asserting both, the runbooks above; with it the fixes the rc.20 run asked for: series seeded at zero, the claim span inside its job, <code>worker sweep</code> under matelot-worker, the image tag pinned by <code>apply --tag</code>, the backup waiting for Postgres, polls never roots (<code>x-matelot-poll</code>) and GETs ratio-sampled</td>
+<td>kind with kube-prometheus-stack + Tempo + Loki: dashboards show the demo pipeline; <code>NoRunnerOnline</code> fires with runners scaled to 0; <code>BackupFailed</code> fires when the CronJob is made to fail</td>
+</tr>
+<tr>
+<td>4 — product</td>
+<td>Settings → Observability, doctor section, audit / security events as OTel logs, customer docs</td>
+<td>render tests for the page; doctor test; the SIEM schema documented and covered by a test that pins the field names</td>
+</tr>
+</tbody></table>
+<p>Acceptance for the milestone: on kind with kube-prometheus-stack, Tempo and Loki installed from their charts and
+<code>observability.*</code> on, all targets up, our dashboards in Grafana with data from the demo-app pipeline, one pipeline
+trace end to end in Tempo with its logs correlated in Loki by <code>trace_id</code>, and the two alerts above firing on demand;
+the Compose profile reaches the same on one host.</p>
+<h2 id="out-of-scope"><a class="anchor" href="#out-of-scope">Out of scope</a></h2>
+<p>Our own hosted Grafana or a multi-cell fleet view (that is step 17, the control plane); profiling (pprof / Pyroscope);
+synthetic checks from outside the cell (the customer&#39;s uptime tooling does that against <code>/api/v1/health/ready</code>);
+metrics per project or per user (cardinality; the product&#39;s own dashboards cover that from the database).</p>
+</article>
+    <footer>Matelot documentation · latest · <a href="../../">home</a> · <a href="https://github.com/matelot-cloud/matelot/discussions" target="_blank" rel="noopener">questions</a> · <a href="https://github.com/matelot-cloud/matelot/releases" target="_blank" rel="noopener">releases</a></footer>
+  </main>
+  <nav class="toc"><div class="toc-title">On this page</div><ul><li class="d2"><a href="#goal">Goal</a></li><li class="d2"><a href="#what-a-cell-emits">What a cell emits</a></li><li class="d3"><a href="#traces">Traces</a></li><li class="d3"><a href="#metrics">Metrics</a></li><li class="d3"><a href="#logs">Logs</a></li><li class="d3"><a href="#configuration">Configuration</a></li><li class="d2"><a href="#delivery">Delivery</a></li><li class="d3"><a href="#helm">Helm</a></li><li class="d3"><a href="#kube-prometheus-stack-recipe">kube-prometheus-stack recipe</a></li><li class="d3"><a href="#docker-compose">Docker Compose</a></li><li class="d3"><a href="#for-customers-who-run-their-own-collector">For customers who run their own collector</a></li><li class="d2"><a href="#dashboards-and-alerts">Dashboards and alerts</a></li><li class="d3"><a href="#alerts">Alerts</a></li><li class="d2"><a href="#product-facing-phase-4">Product-facing (phase 4)</a></li><li class="d2"><a href="#security">Security</a></li><li class="d2"><a href="#plan-four-drops">Plan — four drops</a></li><li class="d2"><a href="#out-of-scope">Out of scope</a></li></ul></nav>
+</div>
+<script src="site.js" defer></script>
+</body>
+</html>
