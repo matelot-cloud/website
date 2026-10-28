@@ -504,7 +504,9 @@ helm upgrade --install alloy grafana/alloy --version 1.14.1 -n monitoring -f dep
     endpoint: &quot;http://tempo.monitoring:4318&quot;
     protocol: http/protobuf
 </code></pre>
-<p>What matters in the stack&#39;s values: <code>prometheus.prometheusSpec.enableFeatures: [exemplar-storage]</code> (the trace links
+<p>Grafana gets <code>GF_PLUGINS_PREINSTALL_DISABLED=true</code> there and on Compose: Grafana 12 otherwise downloads plugins
+(pyroscope, exploretraces, metricsdrilldown) from the internet on every start, which an air-gapped cluster cannot do
+and none of our dashboards needs. What matters in the stack&#39;s values: <code>prometheus.prometheusSpec.enableFeatures: [exemplar-storage]</code> (the trace links
 on the histograms) and <code>serviceMonitorNamespaceSelector: {}</code> (cells live in <code>tenant-&lt;slug&gt;</code>); Grafana&#39;s
 <code>sidecar.datasources.exemplarTraceIdDestinations</code> (<code>trace_id</code> → Tempo) and the Tempo / Loki datasources with
 trace → logs by <code>trace_id</code>; Alloy turning our JSON log lines&#39; <code>trace_id</code> / <code>span_id</code> into Loki structured metadata.
@@ -514,7 +516,9 @@ On a <strong>real cluster</strong> keep all of that and change: Grafana&#39;s ad
 <code>storage.trace.backend: s3</code>), Alertmanager on, Alloy as a DaemonSet with <code>loki.source.file</code> over <code>/var/log/pods</code> if
 the API-based tailing is too much load, and Grafana&#39;s ingress behind your SSO.</p>
 <h3 id="docker-compose"><a class="anchor" href="#docker-compose">Docker Compose</a></h3>
-<p><code>COMPOSE_PROFILES=observability</code> in <code>.env</code> (or <code>docker compose --profile observability up -d</code>) adds:</p>
+<p><code>COMPOSE_PROFILES=observability</code> in <code>.env</code> (or <code>docker compose --profile observability up -d</code>) — on a new cell or an
+existing one: <code>init</code> rewrites the Caddyfile on every <code>up</code> and Caddy reloads it (<code>caddy run --watch</code>), so <code>/grafana/</code>
+appears without recreating anything — adds:</p>
 <table>
 <thead>
 <tr>
