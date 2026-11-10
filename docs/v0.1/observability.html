@@ -357,11 +357,96 @@ default, then <code>module=level</code>, matched against Nest&#39;s logger conte
 (<code>REDACTED_KEYS</code> in <code>log-schema.ts</code>: <code>authorization</code>, <code>cookie</code>, <code>password</code>, <code>secret</code>, <code>token</code>, <code>privateKey</code>,
 <code>clientSecret</code>, <code>webhookSecret</code>, <code>apiKey</code>, <code>registrationToken</code>, <code>runnerToken</code>, …) applied at any depth to every
 logger; <code>log-schema.spec.ts</code> logs an object carrying every known key, nested three levels, and fails if a value
-survives. OTLP log export (<code>OTEL_LOGS_EXPORTER=otlp</code>) comes with drop 2 for customers whose collector prefers it to
-scraping stdout; the stdout line is the primary.</p>
-<p>Audit events and security events (gate failures, token misuse, sign-in anomalies) are also emitted as OTel log
-records with a <strong>stable</strong> <code>event.name</code> (<code>matelot.audit</code>, <code>matelot.security</code>) and documented attributes, so a SIEM
-ingests them without parsing our audit table (phase 4).</p>
+survives. The stdout line is the primary; a log shipper (Alloy, Fluent Bit, the collector&#39;s <code>filelog</code> receiver)
+carries it. The audit / security events below can additionally leave as OTLP log records (<code>OTEL_LOGS_EXPORTER=otlp</code>).</p>
+<h3 id="audit-and-security-events"><a class="anchor" href="#audit-and-security-events">Audit and security events</a></h3>
+<p>Every audit entry and every security-relevant refusal is emitted <strong>twice with the same attributes</strong>: as a stdout line
+of the api (the log schema above plus the attributes, so a shipper is enough) and as an OpenTelemetry log record
+(<code>OTEL_LOGS_EXPORTER=otlp</code> — Helm <code>observability.otlp.logs: true</code>, Compose <code>MATELOT_OTLP_LOGS=1</code> — to the same OTLP
+endpoint as the traces; the Compose profile&#39;s collector forwards them to Loki, where resource attributes become
+labels and the attributes below structured metadata: <code>{service_name=&quot;matelot-api&quot;} | event_name=&quot;matelot.security&quot;</code>).
+The attribute names are a contract (<code>apps/api/src/telemetry/events.ts</code>, pinned by <code>events.spec.ts</code> and exercised end
+to end by <code>test/span-budget.mjs</code>): a rename is a breaking change for every SIEM rule written against them. Resource
+attributes on every record: <code>service.name</code> (<code>matelot-api</code>), <code>service.version</code>, <code>matelot.cell</code>, <code>matelot.component</code>,
+<code>deployment.environment</code>; the instrumentation scope is <code>matelot.events</code>.</p>
+<p><strong><code>event.name = matelot.audit</code></strong> — severity INFO, one per row of the audit trail (<code>AuditService.record</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>matelot.audit.action</code></td>
+<td>dotted verb: <code>project.created</code>, <code>member.role_changed</code>, <code>gate.fail</code>, <code>pipeline.created</code>, <code>backup.succeeded</code>, … (the audit trail&#39;s own)</td>
+</tr>
+<tr>
+<td><code>matelot.audit.resource.type</code>, <code>matelot.audit.resource.id</code></td>
+<td>what it acted on: <code>project</code>, <code>integration</code>, <code>policy</code>, <code>gate_evaluation</code>, <code>user</code>, <code>token</code>, … and the cell&#39;s id</td>
+</tr>
+<tr>
+<td><code>matelot.audit.reason</code></td>
+<td>the reason the actor gave, when the API asked for one</td>
+</tr>
+<tr>
+<td><code>matelot.audit.before</code>, <code>matelot.audit.after</code></td>
+<td>the state as JSON, keys of the redaction list censored at any depth, clipped at 4 KiB; absent when there is none</td>
+</tr>
+<tr>
+<td><code>matelot.actor.type</code>, <code>matelot.actor.id</code>, <code>matelot.actor.label</code></td>
+<td><code>USER</code> / <code>SYSTEM</code> / <code>TOKEN</code> / <code>RUNNER</code>, the id, the e-mail / token name the audit trail shows</td>
+</tr>
+<tr>
+<td><code>matelot.organization.id</code></td>
+<td>the organization, when scoped</td>
+</tr>
+<tr>
+<td><code>matelot.request.id</code>, <code>client.address</code>, <code>user_agent.original</code></td>
+<td>the request that caused it (<code>x-request-id</code>, the caller&#39;s IP as the API saw it, the user agent)</td>
+</tr>
+</tbody></table>
+<p><strong><code>event.name = matelot.security</code></strong> — severity WARN, one per refusal (the exception filter) or policy gate failure:</p>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>matelot.security.kind</code></td>
+<td><code>auth.failed</code> (401, no valid credential), <code>token.rejected</code> (401 on a signed CI token: signature, expiry, revoked, replayed nonce), <code>account.disabled</code> (401, disabled account), <code>access.denied</code> (403, authenticated but not allowed), <code>rate_limit.exceeded</code> (429), <code>gate.failed</code> (a policy gate blocked a stage / deployment)</td>
+</tr>
+<tr>
+<td><code>matelot.security.reason</code></td>
+<td>the refusal&#39;s own message (never a credential)</td>
+</tr>
+<tr>
+<td><code>matelot.auth.method</code></td>
+<td>how the caller tried: <code>jwt</code>, <code>api_token</code> (signed CI token), <code>personal_token</code>, <code>runner</code>, <code>anonymous</code></td>
+</tr>
+<tr>
+<td><code>http.request.method</code>, <code>http.route</code>, <code>http.response.status_code</code></td>
+<td>the route <strong>template</strong> (never the raw path) and the status</td>
+</tr>
+<tr>
+<td><code>matelot.actor.*</code>, <code>matelot.organization.id</code></td>
+<td>the caller when it was identified before the refusal (a 403)</td>
+</tr>
+<tr>
+<td><code>matelot.project.id</code>, <code>matelot.service.id</code>, <code>matelot.gate.violations</code></td>
+<td><code>gate.failed</code> only: the project / service and the <code>&lt;policy&gt;: &lt;message&gt;</code> lines (≤ 4 KiB)</td>
+</tr>
+<tr>
+<td><code>matelot.request.id</code>, <code>client.address</code>, <code>user_agent.original</code></td>
+<td>as above</td>
+</tr>
+</tbody></table>
+<p>A burst of <code>auth.failed</code> from one <code>client.address</code>, <code>access.denied</code> on routes a token never used before, or any
+<code>gate.failed</code> in production are the rules to start with. The records are not a replacement for the audit trail
+(<code>GET /organizations/:id/audit-events</code>, which stays the source of record); they are its copy for the tools that
+already watch everything else.</p>
 <h3 id="configuration"><a class="anchor" href="#configuration">Configuration</a></h3>
 <p>Standard OTel variables first, ours only where OTel has none. Every variable exists in both delivery forms
 (<code>api-configmap.yaml</code> and <code>compose-init.sh</code>&#39;s <code>env/api.env</code> — the existing rule) and in <code>apps/api/src/config/env.ts</code>.</p>
@@ -392,6 +477,16 @@ ingests them without parsing our audit table (phase 4).</p>
 <td><code>OTEL_TRACES_EXPORTER</code></td>
 <td><code>otlp</code> (default), <code>console</code>, <code>file</code> (JSON lines to <code>OTEL_TRACES_FILE</code>; tests), <code>none</code></td>
 <td><code>otlp</code></td>
+</tr>
+<tr>
+<td><code>OTEL_LOGS_EXPORTER</code></td>
+<td>the audit / security event records: <code>otlp</code>, <code>console</code>, <code>file</code> (<code>OTEL_LOGS_FILE</code>; tests), <code>none</code> — independent of tracing</td>
+<td><code>none</code> (stdout lines only)</td>
+</tr>
+<tr>
+<td><code>MATELOT_GRAFANA_URL</code></td>
+<td>the &quot;Open Grafana&quot; link on Settings → Observability and in <code>matelot doctor</code> (Helm <code>observability.grafana.url</code>; the Compose profile sets its own <code>/grafana</code>)</td>
+<td>unset</td>
 </tr>
 <tr>
 <td><code>OTEL_SERVICE_NAME</code>, <code>OTEL_RESOURCE_ATTRIBUTES</code></td>
@@ -448,6 +543,9 @@ no monitoring CRD and runs on a bare kind cluster.</p>
     tracesSampler: parentbased_always_on
     tracesSamplerArg: &quot;&quot;
     metrics: false                # also push metrics over OTLP (OTEL_METRICS_EXPORTER=prometheus,otlp)
+    logs: false                   # the audit / security events as OTLP log records too (OTEL_LOGS_EXPORTER=otlp)
+  grafana:
+    url: &quot;&quot;                      # where your Grafana is: the link on Administration → Observability and in doctor
 </code></pre>
 <p>What renders:</p>
 <ul>
@@ -509,7 +607,11 @@ helm upgrade --install alloy grafana/alloy --version 1.14.1 -n monitoring -f dep
 and none of our dashboards needs. What matters in the stack&#39;s values: <code>prometheus.prometheusSpec.enableFeatures: [exemplar-storage]</code> (the trace links
 on the histograms) and <code>serviceMonitorNamespaceSelector: {}</code> (cells live in <code>tenant-&lt;slug&gt;</code>); Grafana&#39;s
 <code>sidecar.datasources.exemplarTraceIdDestinations</code> (<code>trace_id</code> → Tempo) and the Tempo / Loki datasources with
-trace → logs by <code>trace_id</code>; Alloy turning our JSON log lines&#39; <code>trace_id</code> / <code>span_id</code> into Loki structured metadata.
+trace → logs by <code>trace_id</code> (in the trace view, a span&#39;s <strong>Related logs</strong> button — Grafana 12&#39;s name for it); Alloy
+turning our JSON log lines&#39; <code>trace_id</code> / <code>span_id</code> into Loki structured metadata. The trace page&#39;s header shows
+&quot;POST 201 · Route …&quot; for a pipeline trace: Grafana takes the first span of the trace that carries HTTP attributes
+(its <code>findHeaderTags</code>), and that is the api request that started the first job — the pipeline&#39;s root and job spans
+themselves carry only <code>matelot.*</code> attributes (the span-budget test fails on anything else).
 On a <strong>real cluster</strong> keep all of that and change: Grafana&#39;s admin password from a Secret
 (<code>grafana.admin.existingSecret</code>), persistence and retention sized for the cluster (Prometheus
 <code>storageSpec</code>, Loki / Tempo on object storage — <code>loki.storage.type: s3</code>, <code>deploymentMode: SimpleScalable</code>, Tempo
@@ -530,7 +632,7 @@ appears without recreating anything — adds:</p>
 <tbody><tr>
 <td><code>otel-collector</code></td>
 <td>otel/opentelemetry-collector-contrib 0.163.1</td>
-<td>OTLP in (the cell&#39;s <code>MATELOT_OTLP_ENDPOINT</code> defaults to <code>http://otel-collector:4318</code> with the profile), <code>matelot.cell</code> resource attribute, traces → Tempo</td>
+<td>OTLP in (the cell&#39;s <code>MATELOT_OTLP_ENDPOINT</code> defaults to <code>http://otel-collector:4318</code> with the profile), <code>matelot.cell</code> resource attribute, traces → Tempo, log records → Loki&#39;s OTLP endpoint (<code>MATELOT_OTLP_LOGS=1</code>; with the profile the events reach Loki through Alloy&#39;s container logs anyway, so this is for a collector of your own)</td>
 </tr>
 <tr>
 <td><code>prometheus</code></td>
@@ -817,17 +919,22 @@ the ingress; rate limits). Users see browser warnings when it expires.</p>
 storage class allows expansion; otherwise prune — backup retention (<code>backup.retentionDays</code>), registry garbage
 collection, or the database&#39;s own growth (SBOM documents are the bulk). Postgres stopping on a full disk takes the
 cell down.</p>
-<h2 id="product-facing-phase-4"><a class="anchor" href="#product-facing-phase-4">Product-facing (phase 4)</a></h2>
+<h2 id="checking-a-cell-drop-4"><a class="anchor" href="#checking-a-cell-drop-4">Checking a cell (drop 4)</a></h2>
 <ul>
-<li><strong>Settings → Observability</strong> (cell administrators, under Administration): what is enabled (metrics, tracing, log
-export), the configured endpoints (headers masked), the last scrape time per component (each process records the
-time of its last <code>/metrics</code> request), a <strong>Test OTLP</strong> button (the API sends one span and reports the exporter&#39;s
-result), and the Grafana link when <code>observability.grafana.url</code> is set.</li>
-<li><code>matelot doctor</code> gains an <em>observability</em> section: metrics endpoint reachable (through the API, since 9464 is
-not public), OTLP configured, last trace seen, last scrape.</li>
-<li>Audit and security events as OTel logs (schema above), documented field by field.</li>
-<li>Public docs: this page, rewritten for customers (recipes, dashboard gallery, alert list with runbooks, collector
-config).</li>
+<li><strong>Administration → Observability</strong> in the web app (cell administrators): whether metrics, tracing and OTLP log
+export are on; the last <code>/metrics</code> scrape served by the api, the worker and the runners (each process writes a
+15 s heartbeat of its telemetry state into Redis — <code>matelot:observability:&lt;component&gt;</code> — and the runners report
+<code>metricsScrapedAt</code> / <code>tracing</code> in their heartbeat metadata); the last span that ended; the OTLP endpoint with the
+header <strong>names</strong> only (<code>Authorization=••••</code>); export failures with the last error; the audit / security events
+emitted; a <strong>Test OTLP</strong> button (<code>POST /api/v1/admin/observability/test-otlp</code>: ends a span named <code>matelot.test</code>
+and a log record with <code>event.name = matelot.test</code>, flushes both providers and reports whether the exporters logged
+a failure); and the Grafana link when <code>observability.grafana.url</code> / <code>MATELOT_GRAFANA_URL</code> is set. The page is
+read-only — the settings live in the chart values and <code>.env</code>. <code>GET /api/v1/admin/observability</code> is the same data as
+JSON.</li>
+<li><code>matelot doctor</code> has an <em>observability</em> section (cell administrators; older APIs → skipped): <code>metrics</code> (scraped in
+the last 5 minutes, else &quot;nothing is scraping&quot; — reported, not failed), <code>tracing</code> (off → reported; on with export
+failures → <strong>FAIL</strong>), <code>events</code> (counts and where the records go), <code>grafana</code> (the link). <code>matelot doctor --test-otlp</code>
+adds <code>otlp-test</code> / <code>otlp-logs</code> with the test above; <code>--json</code> for a monitoring script.</li>
 </ul>
 <h2 id="security"><a class="anchor" href="#security">Security</a></h2>
 <ul>
@@ -870,9 +977,9 @@ referenced by every pod through a <code>secretKeyRef</code>; the chart refuses h
 <td>kind with kube-prometheus-stack + Tempo + Loki: dashboards show the demo pipeline; <code>NoRunnerOnline</code> fires with runners scaled to 0; <code>BackupFailed</code> fires when the CronJob is made to fail</td>
 </tr>
 <tr>
-<td>4 — product</td>
-<td>Settings → Observability, doctor section, audit / security events as OTel logs, customer docs</td>
-<td>render tests for the page; doctor test; the SIEM schema documented and covered by a test that pins the field names</td>
+<td>4 — product ✅</td>
+<td>Administration → Observability (<code>GET /admin/observability</code>, Test OTLP), <code>matelot doctor</code> observability section (+ <code>--test-otlp</code>), audit / security events as stdout lines + OTel log records (<code>OTEL_LOGS_EXPORTER</code>, <code>observability.otlp.logs</code>, <code>MATELOT_OTLP_LOGS</code>, the Compose collector&#39;s logs pipeline to Loki), the schema above</td>
+<td><code>events.spec.ts</code> pins the event names and every attribute; <code>observability-status.spec.ts</code>; <code>span-budget.mjs</code> checks the records of a real run (audit of the pipeline, a 401 and a 403); web render test of the page; CLI doctor tests</td>
 </tr>
 </tbody></table>
 <p>Acceptance for the milestone: on kind with kube-prometheus-stack, Tempo and Loki installed from their charts and
@@ -886,7 +993,7 @@ metrics per project or per user (cardinality; the product&#39;s own dashboards c
 </article>
     <footer>Matelot documentation · v0.1 · <a href="../../">home</a> · <a href="https://github.com/matelot-cloud/matelot/discussions" target="_blank" rel="noopener">questions</a> · <a href="https://github.com/matelot-cloud/matelot/releases" target="_blank" rel="noopener">releases</a></footer>
   </main>
-  <nav class="toc"><div class="toc-title">On this page</div><ul><li class="d2"><a href="#goal">Goal</a></li><li class="d2"><a href="#what-a-cell-emits">What a cell emits</a></li><li class="d3"><a href="#traces">Traces</a></li><li class="d3"><a href="#metrics">Metrics</a></li><li class="d3"><a href="#logs">Logs</a></li><li class="d3"><a href="#configuration">Configuration</a></li><li class="d2"><a href="#delivery">Delivery</a></li><li class="d3"><a href="#helm">Helm</a></li><li class="d3"><a href="#kube-prometheus-stack-recipe">kube-prometheus-stack recipe</a></li><li class="d3"><a href="#docker-compose">Docker Compose</a></li><li class="d3"><a href="#for-customers-who-run-their-own-collector">For customers who run their own collector</a></li><li class="d2"><a href="#dashboards-and-alerts">Dashboards and alerts</a></li><li class="d3"><a href="#alerts">Alerts</a></li><li class="d2"><a href="#product-facing-phase-4">Product-facing (phase 4)</a></li><li class="d2"><a href="#security">Security</a></li><li class="d2"><a href="#plan-four-drops">Plan — four drops</a></li><li class="d2"><a href="#out-of-scope">Out of scope</a></li></ul></nav>
+  <nav class="toc"><div class="toc-title">On this page</div><ul><li class="d2"><a href="#goal">Goal</a></li><li class="d2"><a href="#what-a-cell-emits">What a cell emits</a></li><li class="d3"><a href="#traces">Traces</a></li><li class="d3"><a href="#metrics">Metrics</a></li><li class="d3"><a href="#logs">Logs</a></li><li class="d3"><a href="#audit-and-security-events">Audit and security events</a></li><li class="d3"><a href="#configuration">Configuration</a></li><li class="d2"><a href="#delivery">Delivery</a></li><li class="d3"><a href="#helm">Helm</a></li><li class="d3"><a href="#kube-prometheus-stack-recipe">kube-prometheus-stack recipe</a></li><li class="d3"><a href="#docker-compose">Docker Compose</a></li><li class="d3"><a href="#for-customers-who-run-their-own-collector">For customers who run their own collector</a></li><li class="d2"><a href="#dashboards-and-alerts">Dashboards and alerts</a></li><li class="d3"><a href="#alerts">Alerts</a></li><li class="d2"><a href="#checking-a-cell-drop-4">Checking a cell (drop 4)</a></li><li class="d2"><a href="#security">Security</a></li><li class="d2"><a href="#plan-four-drops">Plan — four drops</a></li><li class="d2"><a href="#out-of-scope">Out of scope</a></li></ul></nav>
 </div>
 <script src="site.js" defer></script>
 </body>
