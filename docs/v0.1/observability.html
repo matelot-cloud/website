@@ -361,13 +361,37 @@ survives. The stdout line is the primary; a log shipper (Alloy, Fluent Bit, the 
 carries it. The audit / security events below can additionally leave as OTLP log records (<code>OTEL_LOGS_EXPORTER=otlp</code>).</p>
 <h3 id="audit-and-security-events"><a class="anchor" href="#audit-and-security-events">Audit and security events</a></h3>
 <p>Every audit entry and every security-relevant refusal is emitted <strong>twice with the same attributes</strong>: as a stdout line
-of the api (the log schema above plus the attributes, so a shipper is enough) and as an OpenTelemetry log record
-(<code>OTEL_LOGS_EXPORTER=otlp</code> — Helm <code>observability.otlp.logs: true</code>, Compose <code>MATELOT_OTLP_LOGS=1</code> — to the same OTLP
-endpoint as the traces; the Compose profile&#39;s collector forwards them to Loki, where resource attributes become
-labels and the attributes below structured metadata: <code>{service_name=&quot;matelot-api&quot;} | event_name=&quot;matelot.security&quot;</code>).
-The attribute names are a contract (<code>apps/api/src/telemetry/events.ts</code>, pinned by <code>events.spec.ts</code> and exercised end
-to end by <code>test/span-budget.mjs</code>): a rename is a breaking change for every SIEM rule written against them. Resource
-attributes on every record: <code>service.name</code> (<code>matelot-api</code>), <code>service.version</code>, <code>matelot.cell</code>, <code>matelot.component</code>,
+of the process that did it (the log schema above plus the attributes, so a shipper is enough) and as an OpenTelemetry
+log record (<code>OTEL_LOGS_EXPORTER=otlp</code> — Helm <code>observability.otlp.logs: true</code>, Compose <code>MATELOT_OTLP_LOGS=1</code> — to the
+same OTLP endpoint as the traces). That endpoint must take <strong>logs</strong>: an OpenTelemetry Collector or Alloy that forwards
+them to Loki / your SIEM, as the Compose profile&#39;s collector and the kind recipe&#39;s Alloy do. Tempo takes traces only
+(it answers 404 on <code>/v1/logs</code>): with the cell pointed straight at Tempo, leave <code>logs</code> off — the events stay stdout
+lines — or Administration → Observability and <code>matelot doctor</code> show the log export failing.</p>
+<p>Two processes emit them, and both are counted on Administration → Observability:</p>
+<table>
+<thead>
+<tr>
+<th>Process (<code>service.name</code>)</th>
+<th>Emits</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>api (<code>matelot-api</code>)</td>
+<td>every mutation made through the API (projects, members, policies, tokens, integrations, runner registration, a runner&#39;s job completion …) and every refusal: <code>auth.failed</code>, <code>token.rejected</code>, <code>account.disabled</code>, <code>access.denied</code>, <code>rate_limit.exceeded</code></td>
+</tr>
+<tr>
+<td>worker (<code>matelot-worker</code>)</td>
+<td>what happens without a request: the policy gate of a pipeline (<code>gate.pass</code> / <code>gate.fail</code> audits and the <code>gate.failed</code> security event), the job and pipeline transitions after it (<code>job.failed</code>, <code>pipeline.failed</code>, <code>pipeline.succeeded</code>), the sweeper&#39;s timeouts, GitHub sync and webhook processing</td>
+</tr>
+</tbody></table>
+<p>So a SIEM rule on <code>gate.failed</code> reads the worker&#39;s records (or its pod&#39;s stdout), and one on <code>auth.failed</code> the api&#39;s.
+In Loki, OTLP records: <code>{service_name=~&quot;matelot-(api|worker)&quot;} | event_name=&quot;matelot.security&quot;</code> (resource attributes
+are labels — <code>service_name</code>, <code>matelot_cell</code>, <code>matelot_component</code> with the kind recipe&#39;s Loki — and the attributes
+below structured metadata); the same events as stdout lines: <code>{namespace=&quot;tenant-&lt;slug&gt;&quot;} | json | event_name=&quot;matelot.security&quot;</code>. With both paths on, each event is in Loki twice — once per stream, told apart by the
+labels. The attribute names are a contract (<code>apps/api/src/telemetry/events.ts</code>, pinned by <code>events.spec.ts</code> and
+exercised end to end by <code>test/span-budget.mjs</code>, which also checks that the status counts the api&#39;s and the worker&#39;s
+records): a rename is a breaking change for every SIEM rule written against them. Resource attributes on every
+record: <code>service.name</code> (<code>matelot-api</code> / <code>matelot-worker</code>), <code>service.version</code>, <code>matelot.cell</code>, <code>matelot.component</code>,
 <code>deployment.environment</code>; the instrumentation scope is <code>matelot.events</code>.</p>
 <p><strong><code>event.name = matelot.audit</code></strong> — severity INFO, one per row of the audit trail (<code>AuditService.record</code>):</p>
 <table>
@@ -543,7 +567,8 @@ no monitoring CRD and runs on a bare kind cluster.</p>
     tracesSampler: parentbased_always_on
     tracesSamplerArg: &quot;&quot;
     metrics: false                # also push metrics over OTLP (OTEL_METRICS_EXPORTER=prometheus,otlp)
-    logs: false                   # the audit / security events as OTLP log records too (OTEL_LOGS_EXPORTER=otlp)
+    logs: false                   # the audit / security events as OTLP log records too (OTEL_LOGS_EXPORTER=otlp) —
+                                  # only to an endpoint that takes logs (a collector / Alloy), never Tempo directly
   grafana:
     url: &quot;&quot;                      # where your Grafana is: the link on Administration → Observability and in doctor
 </code></pre>
@@ -599,9 +624,17 @@ helm upgrade --install alloy grafana/alloy --version 1.14.1 -n monitoring -f dep
     exporters:
       enabled: true
   otlp:
-    endpoint: &quot;http://tempo.monitoring:4318&quot;
+    endpoint: &quot;http://alloy.monitoring:4318&quot;   # Alloy&#39;s OTLP receiver: traces → Tempo, log records → Loki
     protocol: http/protobuf
+    logs: true                                 # the audit / security events as OTLP log records too
 </code></pre>
+<p>The cell sends OTLP to <strong>Alloy</strong>, not to Tempo: Alloy&#39;s <code>otelcol.receiver.otlp</code> (ports 4317 / 4318 on the <code>alloy</code>
+Service) fans out like the Compose profile&#39;s collector — traces to Tempo, log records to Loki&#39;s <code>/otlp</code> endpoint —
+so <code>logs: true</code> works. (A cell pointed at Tempo directly gets 404 on every log export; <code>values-observability.py</code>
+refuses <code>--logs</code> with a Tempo endpoint.) The recipe&#39;s Loki indexes <code>matelot.cell</code> and <code>matelot.component</code> as labels
+next to <code>service_name</code>. Verified with Alloy 1.14.1 (<code>alloy validate</code> on the config) and Loki 3.6.12: a <code>gate.failed</code>
+record through the receiver answers <code>{service_name=&quot;matelot-api&quot;} | event_name=&quot;matelot.security&quot;</code> with every
+attribute as structured metadata.</p>
 <p>Grafana gets <code>GF_PLUGINS_PREINSTALL_DISABLED=true</code> there and on Compose: Grafana 12 otherwise downloads plugins
 (pyroscope, exploretraces, metricsdrilldown) from the internet on every start, which an air-gapped cluster cannot do
 and none of our dashboards needs. What matters in the stack&#39;s values: <code>prometheus.prometheusSpec.enableFeatures: [exemplar-storage]</code> (the trace links
@@ -922,19 +955,30 @@ cell down.</p>
 <h2 id="checking-a-cell-drop-4"><a class="anchor" href="#checking-a-cell-drop-4">Checking a cell (drop 4)</a></h2>
 <ul>
 <li><strong>Administration → Observability</strong> in the web app (cell administrators): whether metrics, tracing and OTLP log
-export are on; the last <code>/metrics</code> scrape served by the api, the worker and the runners (each process writes a
-15 s heartbeat of its telemetry state into Redis — <code>matelot:observability:&lt;component&gt;</code> — and the runners report
-<code>metricsScrapedAt</code> / <code>tracing</code> in their heartbeat metadata); the last span that ended; the OTLP endpoint with the
-header <strong>names</strong> only (<code>Authorization=••••</code>); export failures with the last error; the audit / security events
-emitted; a <strong>Test OTLP</strong> button (<code>POST /api/v1/admin/observability/test-otlp</code>: ends a span named <code>matelot.test</code>
-and a log record with <code>event.name = matelot.test</code>, flushes both providers and reports whether the exporters logged
-a failure); and the Grafana link when <code>observability.grafana.url</code> / <code>MATELOT_GRAFANA_URL</code> is set. The page is
-read-only — the settings live in the chart values and <code>.env</code>. <code>GET /api/v1/admin/observability</code> is the same data as
-JSON.</li>
+export are on; one row per process — every api and worker pod — with its heartbeat age, the last <code>/metrics</code> scrape
+it served, the last span that ended there, its exporters, the audit / security events it emitted and its export
+failures per signal; the runners from their heartbeat metadata (<code>metricsScrapedAt</code>, <code>tracing</code>); the OTLP endpoints
+with the header <strong>names</strong> only (<code>Authorization=••••</code>); <strong>trace export</strong> and <strong>log export</strong> failures counted
+separately, each with its last error as one line (<code>OTLPExporterError: Not Found (HTTP 404) — POST http://tempo.monitoring:4318/v1/logs</code>; the stack stays in the pod log); the events summed over api and worker, per
+component; a <strong>Test OTLP</strong> button (<code>POST /api/v1/admin/observability/test-otlp</code>: ends a span named <code>matelot.test</code>
+and a log record with <code>event.name = matelot.test</code>, waits up to 12 s for both exports and reports each — a refused
+connection is retried for several seconds before it fails, so an export still pending at 12 s is reported as no
+answer, never as sent); and the Grafana link when <code>observability.grafana.url</code> / <code>MATELOT_GRAFANA_URL</code> is set. The
+page is read-only — the settings live in the chart values and <code>.env</code>. <code>GET /api/v1/admin/observability</code> is the same
+data as JSON.</li>
+<li>How the numbers are gathered: each process writes a heartbeat of its telemetry state into Redis every 15 s,
+<code>matelot:observability:&lt;component&gt;:&lt;pod&gt;</code> (TTL 2 min), and deletes it when it shuts down. The status counts the
+<strong>current</strong> pods only: a heartbeat older than 45 s is <em>stale</em> (a pod killed without shutting down), and an older pod
+of a component whose exporter settings a newer pod replaced is <em>superseded</em> (a rollout) — both are listed with their
+age, never counted, so switching OTLP logs off does not leave a minute of failures from the terminated pods. Two
+replicas with the same settings are both current and add up. Counts are &quot;since the process started&quot;.</li>
 <li><code>matelot doctor</code> has an <em>observability</em> section (cell administrators; older APIs → skipped): <code>metrics</code> (scraped in
-the last 5 minutes, else &quot;nothing is scraping&quot; — reported, not failed), <code>tracing</code> (off → reported; on with export
-failures → <strong>FAIL</strong>), <code>events</code> (counts and where the records go), <code>grafana</code> (the link). <code>matelot doctor --test-otlp</code>
-adds <code>otlp-test</code> / <code>otlp-logs</code> with the test above; <code>--json</code> for a monitoring script.</li>
+the last 5 minutes, else &quot;nothing is scraping&quot; — reported, not failed), <code>tracing</code> (off → reported; trace export
+failures → <strong>FAIL</strong>), <code>events</code> (api + worker counts, <code>api 6/1, worker 3/1</code>, and where the records go; <strong>FAIL</strong> when
+OTLP log export fails — with a hint when the endpoint is Tempo), <code>grafana</code> (<strong>OK</strong> with the link when linked, <code>--</code>
+when not); a replaced or silent pod is named, not counted. <code>matelot doctor --test-otlp</code> adds <code>otlp-test</code> /
+<code>otlp-logs</code> with the test above; <code>--json</code> for a monitoring script. <code>matelot request GET /admin/observability</code> adds
+the <code>/api/v1</code> prefix itself, and an HTML answer (the web app, not the API) is an error with a hint, never printed.</li>
 </ul>
 <h2 id="security"><a class="anchor" href="#security">Security</a></h2>
 <ul>
